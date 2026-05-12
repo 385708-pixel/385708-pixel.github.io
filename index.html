@@ -116,7 +116,7 @@
     function App() {
       const [activeTab, setActiveTab] = useState('entry');
       const [companyInfo, setCompanyInfo] = useState(initialCompanyInfo);
-      const [customers] = useState(initialCustomers);
+      const [customers, setCustomers] = useState(initialCustomers);
       const [deliveries, setDeliveries] = useState(initialDeliveries);
 
       const [printDocument, setPrintDocument] = useState(null); 
@@ -124,7 +124,7 @@
       const renderContent = () => {
         switch (activeTab) {
           case 'entry':
-            return <DataEntryTab customers={customers} deliveries={deliveries} setDeliveries={setDeliveries} />;
+            return <DataEntryTab customers={customers} setCustomers={setCustomers} deliveries={deliveries} setDeliveries={setDeliveries} />;
           case 'slips':
             return <DeliverySlipsTab deliveries={deliveries} customers={customers} onPrint={(data) => setPrintDocument({ type: 'slip', data })} />;
           case 'invoices':
@@ -235,10 +235,10 @@
       );
     }
 
-    function DataEntryTab({ customers, deliveries, setDeliveries }) {
+    function DataEntryTab({ customers, setCustomers, deliveries, setDeliveries }) {
       const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
-        customerId: customers[0]?.id || '',
+        customerName: customers[0]?.name || '',
         itemName: '',
         origin: '',
         quantity: 1,
@@ -246,13 +246,33 @@
         taxRate: 8,
       });
 
+      // 過去の入力履歴からユニークなリストを作成
+      const uniqueItemNames = useMemo(() => {
+        return [...new Set(deliveries.map(d => d.itemName))].filter(Boolean);
+      }, [deliveries]);
+
+      const uniqueOrigins = useMemo(() => {
+        return [...new Set(deliveries.map(d => d.origin))].filter(Boolean);
+      }, [deliveries]);
+
       const handleSubmit = (e) => {
         e.preventDefault();
-        if (!formData.itemName || formData.quantity <= 0 || formData.unitPrice < 0) return;
+        if (!formData.itemName || formData.quantity <= 0 || formData.unitPrice < 0 || !formData.customerName) return;
+
+        let targetCustomerId = '';
+        const existingCustomer = customers.find(c => c.name === formData.customerName);
+        if (existingCustomer) {
+          targetCustomerId = existingCustomer.id;
+        } else {
+          // 新規の顧客名が入力された場合はリストに追加
+          targetCustomerId = 'C' + Date.now();
+          setCustomers([...customers, { id: targetCustomerId, name: formData.customerName }]);
+        }
 
         const newDelivery = {
           id: Date.now(),
           ...formData,
+          customerId: targetCustomerId,
           quantity: Number(formData.quantity),
           unitPrice: Number(formData.unitPrice),
           taxRate: Number(formData.taxRate),
@@ -279,17 +299,47 @@
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">顧客</label>
-                <select required value={formData.customerId} onChange={e => setFormData({...formData, customerId: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white">
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <input 
+                  type="text" 
+                  required 
+                  list="customer-list"
+                  value={formData.customerName} 
+                  onChange={e => setFormData({...formData, customerName: e.target.value})} 
+                  className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" 
+                  placeholder="入力または選択"
+                />
+                <datalist id="customer-list">
+                  {customers.map(c => <option key={c.id} value={c.name} />)}
+                </datalist>
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">内容 (品名)</label>
-                <input type="text" required value={formData.itemName} onChange={e => setFormData({...formData, itemName: e.target.value})} placeholder="例: 養殖アユ" className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+                <input 
+                  type="text" 
+                  required 
+                  list="item-name-list"
+                  value={formData.itemName} 
+                  onChange={e => setFormData({...formData, itemName: e.target.value})} 
+                  placeholder="例: 養殖アユ" 
+                  className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" 
+                />
+                <datalist id="item-name-list">
+                  {uniqueItemNames.map((name, i) => <option key={i} value={name} />)}
+                </datalist>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">産地</label>
-                <input type="text" value={formData.origin} onChange={e => setFormData({...formData, origin: e.target.value})} placeholder="例: 岐阜" className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+                <input 
+                  type="text" 
+                  list="origin-list"
+                  value={formData.origin} 
+                  onChange={e => setFormData({...formData, origin: e.target.value})} 
+                  placeholder="例: 岐阜" 
+                  className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" 
+                />
+                <datalist id="origin-list">
+                  {uniqueOrigins.map((origin, i) => <option key={i} value={origin} />)}
+                </datalist>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">数量 (個)</label>
@@ -639,12 +689,12 @@
             <tbody>
               {items.map((item, index) => (
                 <tr key={index}>
-                  <td className="border border-black py-1.5 px-2 text-center h-[28px]">{index === 0 ? deliveryDate : ''}</td>
+                  <td className="border border-black py-1.5 px-2 text-center">{index === 0 ? deliveryDate : ''}</td>
                   <td className="border border-black py-1.5 px-2">{item.itemName}</td>
                   <td className="border border-black py-1.5 px-2 text-center">{item.origin}</td>
                   <td className="border border-black py-1.5 px-2 text-center">{item.quantity}</td>
-                  <td className="border border-black py-1.5 px-2 text-right">{item.unitPrice}</td>
-                  <td className="border border-black py-1.5 px-2 text-right">{item.quantity * item.unitPrice}</td>
+                  <td className="border border-black py-1.5 px-2 text-right">{formatYen(item.unitPrice)}</td>
+                  <td className="border border-black py-1.5 px-2 text-right">{formatYen(item.quantity * item.unitPrice)}</td>
                 </tr>
               ))}
               {emptyRows.map((_, i) => (
@@ -669,17 +719,17 @@
                 <tbody>
                   <tr>
                     <td className="border border-black py-1 bg-gray-100 w-1/2 text-sm tracking-widest">小計</td>
-                    <td className="border border-black py-1 w-1/2 text-right pr-2">{subtotal}</td>
+                    <td className="border border-black py-1 w-1/2 text-right pr-2">{formatYen(subtotal)}</td>
                   </tr>
                   <tr>
                     <td className="border border-black py-1 bg-gray-100 text-sm tracking-widest">
                       消費税 {tax10 > 0 && tax8 > 0 ? '' : tax8 > 0 ? '(8%)' : '(10%)'}
                     </td>
-                    <td className="border border-black py-1 text-right pr-2">{totalTax}</td>
+                    <td className="border border-black py-1 text-right pr-2">{formatYen(totalTax)}</td>
                   </tr>
                   <tr>
                     <td className="border border-black py-1 bg-gray-100 text-sm tracking-widest">御買上合計額</td>
-                    <td className="border border-black py-1 font-bold text-right pr-2">{grandTotal}</td>
+                    <td className="border border-black py-1 font-bold text-right pr-2">{formatYen(grandTotal)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -784,7 +834,7 @@
                       <td className="border border-black py-1 px-1">{row.itemName}</td>
                       <td className="border border-black py-1 px-1 text-center">{row.origin}</td>
                       <td className="border border-black py-1 px-1 text-right">{row.quantity}</td>
-                      <td className="border border-black py-1 px-1 text-right">{row.unitPrice}</td>
+                      <td className="border border-black py-1 px-1 text-right">{formatYen(row.unitPrice)}</td>
                       <td className="border border-black py-1 px-1 text-right">{formatYen(row.quantity * row.unitPrice)}</td>
                       <td className="border border-black py-1 px-1"></td>
                     </tr>
