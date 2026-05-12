@@ -125,8 +125,28 @@
         fetch(GAS_URL)
           .then(res => res.json())
           .then(data => {
+            // スプレッドシートから取得した日付データ(ISO形式)を YYYY-MM-DD 形式に変換
+            const formattedData = data.map(d => {
+              let formattedDate = String(d.date);
+              // "T"が含まれるISOフォーマット(2026-05-11T15...Z)の場合
+              if (formattedDate.includes('T')) {
+                const dateObj = new Date(formattedDate);
+                if (!isNaN(dateObj.getTime())) {
+                  const year = dateObj.getFullYear();
+                  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                  const day = String(dateObj.getDate()).padStart(2, '0');
+                  formattedDate = `${year}-${month}-${day}`;
+                }
+              } 
+              // スプレッドシート上で 2026/05/10 のようになっている場合
+              else if (formattedDate.includes('/')) {
+                 formattedDate = formattedDate.replace(/\//g, '-');
+              }
+              return { ...d, date: formattedDate };
+            });
+
             // 日付の降順（新しい順）でソートしてセット
-            setDeliveries(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
+            setDeliveries(formattedData.sort((a, b) => new Date(b.date) - new Date(a.date)));
           })
           .catch(err => {
             console.error("データの取得に失敗しました", err);
