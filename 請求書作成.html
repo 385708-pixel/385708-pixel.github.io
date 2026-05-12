@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>納品・請求管理システム</title>
+
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#317EFB">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel (ブラウザ上でJSXをコンパイル) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* 印刷時のスタイル調整 */
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        background-color: white !important;
+      }
+      @page {
+        margin: 0;
+      }
+    }
+    /* スマホ画面下部のセーフエリア用余白 */
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom, 20px);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <div id="root"></div>
+
+  <!-- アプリケーションのコード -->
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // --- アイコンコンポーネント (LucideのSVGを再現) ---
+    const IconBase = ({ children, size = 24, className = "" }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        {children}
+      </svg>
+    );
+    const FileText = (p) => <IconBase {...p}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></IconBase>;
+    const ListPlus = (p) => <IconBase {...p}><path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="M18 9v6"/><path d="M21 12h-6"/></IconBase>;
+    const Printer = (p) => <IconBase {...p}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></IconBase>;
+    const Settings = (p) => <IconBase {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></IconBase>;
+    const Calendar = (p) => <IconBase {...p}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></IconBase>;
+    const Building2 = (p) => <IconBase {...p}><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></IconBase>;
+    const Calculator = (p) => <IconBase {...p}><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></IconBase>;
+    const Trash2 = (p) => <IconBase {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconBase>;
+    const Plus = (p) => <IconBase {...p}><path d="M5 12h14"/><path d="M12 5v14"/></IconBase>;
+
+    // --- 初期データ（サンプル） ---
+    const initialCompanyInfo = {
+      name: '株式会社ASぷらす',
+      address: '大阪市西区阿波座1-10-20-603\nTEL : 06-6539-5152\nFAX : 06-6539-5153\n担当 : 江崎',
+      registrationNumber: 'T7120001259278',
+      bankInfo: '【お振込先】 住信SBIネット銀行 法人第一支店(106) 普通2276800 カ）アスプラス',
+    };
+
+    const initialCustomers = [
+      { id: 'C001', name: '有限会社播磨商店' },
+      { id: 'C002', name: '株式会社 咲天' },
+    ];
+
+    const initialDeliveries = [
+      { id: 1, date: '2026-04-06', customerId: 'C001', itemName: '養殖アユ', origin: '岐阜', quantity: 20, unitPrice: 350, taxRate: 8 },
+      { id: 2, date: '2026-04-07', customerId: 'C001', itemName: '養殖アユ', origin: '岐阜', quantity: 20, unitPrice: 350, taxRate: 8 },
+      { id: 3, date: '2026-04-09', customerId: 'C001', itemName: '養殖アユ', origin: '岐阜', quantity: 20, unitPrice: 350, taxRate: 8 },
+      { id: 4, date: '2026-04-10', customerId: 'C001', itemName: '養殖アユ', origin: '岐阜', quantity: 40, unitPrice: 350, taxRate: 8 },
+      { id: 5, date: '2026-04-02', customerId: 'C002', itemName: 'から付ホタテ', origin: '北海道', quantity: 2, unitPrice: 3500, taxRate: 8 },
+      { id: 6, date: '2026-04-02', customerId: 'C002', itemName: 'アサリ', origin: '中国', quantity: 5, unitPrice: 3500, taxRate: 8 },
+      { id: 7, date: '2026-04-02', customerId: 'C002', itemName: 'ハマグリ', origin: '千葉', quantity: 3, unitPrice: 5500, taxRate: 8 },
+    ];
+
+    // --- ユーティリティ ---
+    const formatYen = (amount) => {
+      return '¥' + new Intl.NumberFormat('ja-JP').format(amount);
+    };
+
+    // --- メインコンポーネント ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('entry');
+      const [companyInfo, setCompanyInfo] = useState(initialCompanyInfo);
+      const [customers] = useState(initialCustomers);
+      const [deliveries, setDeliveries] = useState(initialDeliveries);
+
+      const [printDocument, setPrintDocument] = useState(null); 
+
+      const renderContent = () => {
+        switch (activeTab) {
+          case 'entry':
+            return <DataEntryTab customers={customers} deliveries={deliveries} setDeliveries={setDeliveries} />;
+          case 'slips':
+            return <DeliverySlipsTab deliveries={deliveries} customers={customers} onPrint={(data) => setPrintDocument({ type: 'slip', data })} />;
+          case 'invoices':
+            return <InvoicesTab deliveries={deliveries} customers={customers} companyInfo={companyInfo} onPrint={(data) => setPrintDocument({ type: 'invoice', data })} />;
+          case 'settings':
+            return <SettingsTab companyInfo={companyInfo} setCompanyInfo={setCompanyInfo} />;
+          default:
+            return null;
+        }
+      };
+
+      if (printDocument) {
+        return (
+          <div className="bg-gray-100 min-h-screen text-gray-900 font-sans print:bg-white print:font-serif print:text-black">
+            <div className="print:hidden p-4 bg-white flex flex-col sm:flex-row justify-between items-center border-b sticky top-0 z-10 shadow-sm gap-3">
+              <p className="text-xs text-gray-600">ブラウザの印刷機能を使用して印刷してください。背景のグラフィックをオンにすると綺麗に印刷されます。</p>
+              <div className="flex space-x-3 w-full sm:w-auto">
+                <button onClick={() => window.print()} className="flex-1 sm:flex-none justify-center bg-blue-600 text-white px-4 py-3 sm:py-2 rounded shadow hover:bg-blue-700 flex items-center font-bold">
+                  <Printer size={18} className="mr-2" /> 印刷
+                </button>
+                <button onClick={() => setPrintDocument(null)} className="flex-1 sm:flex-none justify-center bg-gray-300 text-gray-800 px-4 py-3 sm:py-2 rounded shadow hover:bg-gray-400 font-bold">
+                  戻る
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto w-full print:overflow-visible flex justify-center">
+              <div className="p-10 w-[210mm] min-w-[210mm] bg-white print:p-0 print:m-0 shadow-md print:shadow-none my-4 print:my-0 origin-top-left" style={{ minHeight: '297mm' }}>
+                {printDocument.type === 'slip' && <PrintableDeliverySlip data={printDocument.data} companyInfo={companyInfo} />}
+                {printDocument.type === 'invoice' && <PrintableInvoice data={printDocument.data} companyInfo={companyInfo} />}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col font-sans pb-20 md:pb-0">
+          <header className="bg-blue-900 text-white shadow-md sticky top-0 z-10">
+            <div className="max-w-7xl mx-auto px-4 h-14 md:h-16 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Calculator className="h-5 w-5 md:h-6 md:w-6 text-blue-300" />
+                <h1 className="text-lg md:text-xl font-bold truncate">納品・請求管理</h1>
+              </div>
+              <div className="text-xs md:text-sm text-blue-200 truncate ml-4 max-w-[50%]">
+                {companyInfo.name}
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 max-w-7xl mx-auto w-full flex flex-col md:flex-row p-0 md:p-4 gap-6">
+            <aside className="hidden md:block w-64 flex-shrink-0">
+              <nav className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden sticky top-24">
+                <ul className="flex flex-col">
+                  <DesktopNavItem icon={<ListPlus />} label="納品データ入力" active={activeTab === 'entry'} onClick={() => setActiveTab('entry')} />
+                  <DesktopNavItem icon={<FileText />} label="納品書発行" active={activeTab === 'slips'} onClick={() => setActiveTab('slips')} />
+                  <DesktopNavItem icon={<Printer />} label="請求書発行" active={activeTab === 'invoices'} onClick={() => setActiveTab('invoices')} />
+                  <div className="h-px bg-slate-200 my-2"></div>
+                  <DesktopNavItem icon={<Settings />} label="設定 (自社情報)" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+                </ul>
+              </nav>
+            </aside>
+
+            <section className="flex-1 bg-white md:rounded-lg shadow-sm border-y md:border border-slate-200 p-4 md:p-6">
+              {renderContent()}
+            </section>
+          </main>
+
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around pb-safe z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+            <MobileNavItem icon={<ListPlus />} label="入力" active={activeTab === 'entry'} onClick={() => setActiveTab('entry')} />
+            <MobileNavItem icon={<FileText />} label="納品書" active={activeTab === 'slips'} onClick={() => setActiveTab('slips')} />
+            <MobileNavItem icon={<Printer />} label="請求書" active={activeTab === 'invoices'} onClick={() => setActiveTab('invoices')} />
+            <MobileNavItem icon={<Settings />} label="設定" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+          </nav>
+        </div>
+      );
+    }
+
+    function DesktopNavItem({ icon, label, active, onClick }) {
+      return (
+        <li>
+          <button
+            onClick={onClick}
+            className={`w-full flex items-center px-4 py-3 text-left transition-colors ${
+              active ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600 font-medium' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
+            }`}
+          >
+            <span className="mr-3">{React.cloneElement(icon, { size: 20 })}</span>
+            {label}
+          </button>
+        </li>
+      );
+    }
+
+    function MobileNavItem({ icon, label, active, onClick }) {
+      return (
+        <button
+          onClick={onClick}
+          className={`flex-1 flex flex-col items-center justify-center py-2 px-1 transition-colors ${
+            active ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <div className={`mb-1 flex items-center justify-center w-12 h-8 rounded-full transition-colors ${active ? 'bg-blue-100' : ''}`}>
+            {React.cloneElement(icon, { size: 22 })}
+          </div>
+          <span className="text-[10px] font-medium">{label}</span>
+        </button>
+      );
+    }
+
+    function DataEntryTab({ customers, deliveries, setDeliveries }) {
+      const [formData, setFormData] = useState({
+        date: new Date().toISOString().split('T')[0],
+        customerId: customers[0]?.id || '',
+        itemName: '',
+        origin: '',
+        quantity: 1,
+        unitPrice: 0,
+        taxRate: 8,
+      });
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!formData.itemName || formData.quantity <= 0 || formData.unitPrice < 0) return;
+
+        const newDelivery = {
+          id: Date.now(),
+          ...formData,
+          quantity: Number(formData.quantity),
+          unitPrice: Number(formData.unitPrice),
+          taxRate: Number(formData.taxRate),
+        };
+        setDeliveries([newDelivery, ...deliveries]);
+        setFormData({ ...formData, itemName: '', origin: '', quantity: 1, unitPrice: 0 }); 
+      };
+
+      const handleDelete = (id) => {
+        setDeliveries(deliveries.filter(d => d.id !== id));
+      };
+
+      return (
+        <div>
+          <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
+            <ListPlus className="mr-2" /> 納品データの入力
+          </h2>
+          
+          <form onSubmit={handleSubmit} className="bg-slate-50 p-4 md:p-5 rounded-lg border border-slate-200 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">納品日</label>
+                <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">顧客</label>
+                <select required value={formData.customerId} onChange={e => setFormData({...formData, customerId: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white">
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">内容 (品名)</label>
+                <input type="text" required value={formData.itemName} onChange={e => setFormData({...formData, itemName: e.target.value})} placeholder="例: 養殖アユ" className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">産地</label>
+                <input type="text" value={formData.origin} onChange={e => setFormData({...formData, origin: e.target.value})} placeholder="例: 岐阜" className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">数量 (個)</label>
+                <input type="number" required min="1" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">単価 (円)</label>
+                <input type="number" required min="0" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">税率</label>
+                <select value={formData.taxRate} onChange={e => setFormData({...formData, taxRate: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white">
+                  <option value="8">8% (軽減税率)</option>
+                  <option value="10">10% (標準税率)</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button type="submit" className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 md:py-2 rounded-md font-bold flex items-center justify-center transition-colors">
+                <Plus size={18} className="mr-2" /> 登録する
+              </button>
+            </div>
+          </form>
+
+          <h3 className="font-bold text-slate-700 mb-3">最近の登録データ</h3>
+          
+          <div className="hidden md:block overflow-x-auto border border-slate-200 rounded-lg">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-100 text-slate-600 border-b">
+                <tr>
+                  <th className="px-4 py-3">納品日</th>
+                  <th className="px-4 py-3">顧客</th>
+                  <th className="px-4 py-3">内容</th>
+                  <th className="px-4 py-3">産地</th>
+                  <th className="px-4 py-3 text-right">数量</th>
+                  <th className="px-4 py-3 text-right">単価(円)</th>
+                  <th className="px-4 py-3 text-center">税率</th>
+                  <th className="px-4 py-3 text-center">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deliveries.slice(0, 10).map((d) => (
+                  <tr key={d.id} className="border-b hover:bg-slate-50">
+                    <td className="px-4 py-3">{d.date}</td>
+                    <td className="px-4 py-3">{customers.find(c => c.id === d.customerId)?.name}</td>
+                    <td className="px-4 py-3">{d.itemName}</td>
+                    <td className="px-4 py-3">{d.origin}</td>
+                    <td className="px-4 py-3 text-right">{d.quantity}</td>
+                    <td className="px-4 py-3 text-right">{formatYen(d.unitPrice)}</td>
+                    <td className="px-4 py-3 text-center">{d.taxRate}%</td>
+                    <td className="px-4 py-3 text-center">
+                      <button onClick={() => handleDelete(d.id)} className="text-red-500 hover:text-red-700 p-1">
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {deliveries.length === 0 && (
+                  <tr><td colSpan="8" className="px-4 py-8 text-center text-slate-500">データがありません</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="md:hidden space-y-3">
+            {deliveries.slice(0, 10).map((d) => (
+              <div key={d.id} className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm relative">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-1 rounded">
+                    {d.date}
+                  </span>
+                  <button onClick={() => handleDelete(d.id)} className="text-red-500 hover:text-red-700 p-2 -mt-2 -mr-2 bg-red-50 rounded-full">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                <div className="font-bold text-slate-800 mb-1 text-sm">
+                  {customers.find(c => c.id === d.customerId)?.name}
+                </div>
+                <div className="text-base text-slate-800 mb-2 font-medium">
+                  {d.itemName} {d.origin && <span className="text-xs text-slate-500 ml-1 font-normal">({d.origin})</span>}
+                </div>
+                <div className="flex justify-between items-end border-t border-slate-100 pt-2 mt-2">
+                  <div className="text-sm text-slate-600">
+                    {d.quantity}個 × {formatYen(d.unitPrice)}
+                    <span className="ml-2 bg-slate-100 text-xs px-1.5 py-0.5 rounded text-slate-500">{d.taxRate}%</span>
+                  </div>
+                  <div className="font-bold text-blue-700 text-lg">
+                    {formatYen(d.quantity * d.unitPrice)}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {deliveries.length === 0 && (
+              <div className="py-8 text-center text-slate-500 border border-slate-200 rounded-lg bg-slate-50">
+                データがありません
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function DeliverySlipsTab({ deliveries, customers, onPrint }) {
+      const groupedDeliveries = useMemo(() => {
+        const groups = {};
+        deliveries.forEach(d => {
+          const key = `${d.date}_${d.customerId}`;
+          if (!groups[key]) {
+            groups[key] = {
+              date: d.date,
+              customer: customers.find(c => c.id === d.customerId),
+              items: [],
+              totalAmount: 0,
+              tax8: 0,
+              tax10: 0
+            };
+          }
+          groups[key].items.push(d);
+          const lineTotal = d.quantity * d.unitPrice;
+          groups[key].totalAmount += lineTotal; 
+          if(d.taxRate === 8) groups[key].tax8 += lineTotal * 0.08;
+          if(d.taxRate === 10) groups[key].tax10 += lineTotal * 0.1;
+        });
+        return Object.values(groups).sort((a, b) => new Date(b.date) - new Date(a.date));
+      }, [deliveries, customers]);
+
+      return (
+        <div>
+          <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
+            <FileText className="mr-2" /> 納品書発行
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {groupedDeliveries.map((group, index) => (
+              <div key={index} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-medium flex items-center">
+                      <Calendar size={12} className="mr-1"/> {group.date}
+                    </span>
+                    <span className="text-sm text-slate-500">{group.items.length}件</span>
+                  </div>
+                  <h3 className="font-bold text-lg text-slate-800 mb-1">{group.customer?.name}</h3>
+                  <p className="text-sm text-slate-600 mb-4 line-clamp-2">
+                    {group.items.map(i => i.itemName).join(', ')}
+                  </p>
+                </div>
+                <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+                  <div className="text-sm text-slate-500">
+                    税抜小計: <span className="font-semibold text-slate-800">{formatYen(group.totalAmount)}</span>
+                  </div>
+                  <button 
+                    onClick={() => onPrint(group)}
+                    className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded text-sm flex items-center transition-colors"
+                  >
+                    <Printer size={14} className="mr-1" /> 納品書プレビュー
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function InvoicesTab({ deliveries, customers, companyInfo, onPrint }) {
+      const [selectedCustomer, setSelectedCustomer] = useState(customers[0]?.id || '');
+      
+      const today = new Date();
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+      
+      const [startDate, setStartDate] = useState(firstDay);
+      const [endDate, setEndDate] = useState(lastDay);
+
+      const invoiceData = useMemo(() => {
+        if (!selectedCustomer || !startDate || !endDate) return null;
+
+        const filteredItems = deliveries.filter(d => 
+          d.customerId === selectedCustomer && 
+          d.date >= startDate && 
+          d.date <= endDate
+        ).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        if (filteredItems.length === 0) return null;
+
+        let subtotal10 = 0;
+        let subtotal8 = 0;
+
+        filteredItems.forEach(item => {
+          const lineTotal = item.quantity * item.unitPrice;
+          if (item.taxRate === 10) subtotal10 += lineTotal;
+          if (item.taxRate === 8) subtotal8 += lineTotal;
+        });
+
+        const tax10 = Math.floor(subtotal10 * 0.1);
+        const tax8 = Math.floor(subtotal8 * 0.08);
+
+        const totalSubtotal = subtotal10 + subtotal8;
+        const totalTax = tax10 + tax8;
+        const grandTotal = totalSubtotal + totalTax;
+
+        return {
+          customer: customers.find(c => c.id === selectedCustomer),
+          startDate,
+          endDate,
+          items: filteredItems,
+          totals: {
+            subtotal10, subtotal8, tax10, tax8, totalSubtotal, totalTax, grandTotal
+          }
+        };
+      }, [deliveries, customers, selectedCustomer, startDate, endDate]);
+
+      return (
+        <div>
+          <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
+            <Printer className="mr-2" /> 請求書発行 (画像フォーマット)
+          </h2>
+          
+          <div className="bg-blue-50 border border-blue-100 p-4 md:p-5 rounded-lg mb-6">
+            <h3 className="font-semibold text-blue-900 mb-3">対象の絞り込み</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">顧客</label>
+                <select value={selectedCustomer} onChange={e => setSelectedCustomer(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white">
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">開始日</label>
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">終了日</label>
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+              </div>
+            </div>
+          </div>
+
+          {invoiceData ? (
+            <div className="border border-slate-200 rounded-lg p-4 md:p-6 bg-white shadow-sm flex flex-col items-center md:items-stretch">
+              <div className="flex flex-col md:flex-row justify-between items-center w-full mb-4 md:mb-6 gap-4">
+                <div className="text-center md:text-left">
+                  <h3 className="text-lg md:text-xl font-bold text-slate-800">{invoiceData.customer.name} 御中</h3>
+                  <p className="text-sm text-slate-500 mt-2 md:mt-1">
+                    ご請求金額: <span className="font-bold text-2xl md:text-xl text-blue-700 md:text-slate-800 ml-2">{formatYen(invoiceData.totals.grandTotal)}</span>
+                  </p>
+                </div>
+                <button 
+                  onClick={() => onPrint(invoiceData)}
+                  className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 md:py-2.5 rounded-md font-bold flex items-center justify-center transition-colors shadow"
+                >
+                  <Printer size={18} className="mr-2" /> 請求書プレビュー
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-slate-50 border border-slate-200 rounded-lg border-dashed">
+              <Calculator className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+              <p className="text-slate-500">指定された条件の納品データはありません。</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function SettingsTab({ companyInfo, setCompanyInfo }) {
+      const handleChange = (e) => {
+        setCompanyInfo({ ...companyInfo, [e.target.name]: e.target.value });
+      };
+
+      return (
+        <div className="max-w-2xl pb-10">
+          <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
+            <Building2 className="mr-2" /> 自社情報・設定
+          </h2>
+
+          <div className="space-y-4 md:space-y-5 bg-white border border-slate-200 p-4 md:p-6 rounded-lg shadow-sm">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">会社名 / 屋号</label>
+              <input type="text" name="name" value={companyInfo.name} onChange={handleChange} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">住所・連絡先など</label>
+              <textarea name="address" value={companyInfo.address} onChange={handleChange} rows="4" className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm"></textarea>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">登録番号</label>
+              <input type="text" name="registrationNumber" value={companyInfo.registrationNumber} onChange={handleChange} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm font-mono" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">振込先</label>
+              <textarea name="bankInfo" value={companyInfo.bankInfo} onChange={handleChange} rows="3" className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm"></textarea>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const formatDateJP = (dateString) => {
+      if (!dateString) return '';
+      const d = new Date(dateString);
+      return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    };
+
+    function PrintableDeliverySlip({ data, companyInfo }) {
+      const { items, customer, tax8, tax10, totalAmount } = data;
+      const deliveryDate = items.length > 0 ? items[0].date.split('-').slice(1).join('/') : '';
+      const MIN_ROWS = 15;
+      const emptyRowsCount = Math.max(0, MIN_ROWS - items.length);
+      const emptyRows = Array(emptyRowsCount).fill(null);
+
+      const subtotal = totalAmount;
+      const totalTax = Math.floor(tax8) + Math.floor(tax10);
+      const grandTotal = subtotal + totalTax;
+
+      return (
+        <div className="text-[13px] leading-snug tracking-wider">
+          <div className="flex justify-between items-start mb-6">
+            <div className="w-1/2 pt-10">
+              <h2 className="text-xl font-bold border-b border-black pb-1 mb-6 inline-block min-w-[70%]">
+                {customer.name} <span className="text-base font-normal ml-4">御中</span>
+              </h2>
+              <p className="mt-2">下記のとおり納品致しましたのでご査収ください</p>
+            </div>
+            <div className="w-5/12 text-right relative">
+              <h1 className="text-2xl font-bold tracking-[0.5em] mb-4 text-center mr-8">納品書</h1>
+              <div className="text-left inline-block">
+                <p className="font-bold text-lg mb-1">{companyInfo.name}</p>
+                <p className="whitespace-pre-line mb-1 leading-relaxed">{companyInfo.address}</p>
+                <p className="mt-2 text-xs">登録番号: {companyInfo.registrationNumber}</p>
+                <div className="absolute top-12 right-0 w-16 h-16 border-2 border-red-500 rounded flex items-center justify-center text-red-500 opacity-40 text-xs">社印</div>
+              </div>
+            </div>
+          </div>
+
+          <table className="w-full border-collapse border-2 border-black mb-1">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border border-black py-1.5 px-2 w-[12%] font-normal">納品日</th>
+                <th className="border border-black py-1.5 px-2 w-[30%] font-normal">内容</th>
+                <th className="border border-black py-1.5 px-2 w-[15%] font-normal">産地</th>
+                <th className="border border-black py-1.5 px-2 w-[10%] font-normal">数量（個）</th>
+                <th className="border border-black py-1.5 px-2 w-[15%] font-normal">単価（円）</th>
+                <th className="border border-black py-1.5 px-2 w-[18%] font-normal">金額</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, index) => (
+                <tr key={index}>
+                  <td className="border border-black py-1.5 px-2 text-center h-[28px]">{index === 0 ? deliveryDate : ''}</td>
+                  <td className="border border-black py-1.5 px-2">{item.itemName}</td>
+                  <td className="border border-black py-1.5 px-2 text-center">{item.origin}</td>
+                  <td className="border border-black py-1.5 px-2 text-center">{item.quantity}</td>
+                  <td className="border border-black py-1.5 px-2 text-right">{item.unitPrice}</td>
+                  <td className="border border-black py-1.5 px-2 text-right">{item.quantity * item.unitPrice}</td>
+                </tr>
+              ))}
+              {emptyRows.map((_, i) => (
+                <tr key={`empty-${i}`}>
+                  <td className="border border-black py-1.5 px-2 h-[28px]"></td>
+                  <td className="border border-black py-1.5 px-2"></td>
+                  <td className="border border-black py-1.5 px-2"></td>
+                  <td className="border border-black py-1.5 px-2"></td>
+                  <td className="border border-black py-1.5 px-2"></td>
+                  <td className="border border-black py-1.5 px-2"></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="flex justify-between items-end mt-2">
+            <div className="w-1/3 border-2 border-black h-32 p-1 relative">
+              <span className="absolute top-1 left-1 text-xs">備考</span>
+            </div>
+            <div className="w-[33%]">
+              <table className="w-full border-collapse border-2 border-black text-center">
+                <tbody>
+                  <tr>
+                    <td className="border border-black py-1 bg-gray-100 w-1/2 text-sm tracking-widest">小計</td>
+                    <td className="border border-black py-1 w-1/2 text-right pr-2">{subtotal}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black py-1 bg-gray-100 text-sm tracking-widest">
+                      消費税 {tax10 > 0 && tax8 > 0 ? '' : tax8 > 0 ? '(8%)' : '(10%)'}
+                    </td>
+                    <td className="border border-black py-1 text-right pr-2">{totalTax}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-black py-1 bg-gray-100 text-sm tracking-widest">御買上合計額</td>
+                    <td className="border border-black py-1 font-bold text-right pr-2">{grandTotal}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function PrintableInvoice({ data, companyInfo }) {
+      const { customer, startDate, endDate, items, totals } = data;
+      const displayRows = [];
+      let currentDate = null;
+      let dailySubtotal = 0;
+      let dailyTax = 0;
+
+      items.forEach((item) => {
+        if (currentDate !== item.date && currentDate !== null) {
+          displayRows.push({ type: 'daily_total', subtotal: dailySubtotal, tax: dailyTax });
+          dailySubtotal = 0;
+          dailyTax = 0;
+        }
+        currentDate = item.date;
+        displayRows.push({ type: 'item', ...item });
+        const lineTotal = item.quantity * item.unitPrice;
+        dailySubtotal += lineTotal;
+        dailyTax += Math.floor(lineTotal * (item.taxRate / 100));
+      });
+
+      if (currentDate !== null) {
+        displayRows.push({ type: 'daily_total', subtotal: dailySubtotal, tax: dailyTax });
+      }
+
+      const MIN_ROWS = 25;
+      const emptyRowsCount = Math.max(0, MIN_ROWS - displayRows.length);
+      const emptyRows = Array(emptyRowsCount).fill(null);
+      const closingDateStr = formatDateJP(endDate);
+
+      let taxLabel = "";
+      if (totals.tax8 > 0 && totals.tax10 === 0) taxLabel = "内消費税8%";
+      else if (totals.tax10 > 0 && totals.tax8 === 0) taxLabel = "内消費税10%";
+      else taxLabel = "内消費税"; 
+
+      return (
+        <div className="text-[13px] leading-snug">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold tracking-[0.5em] inline-block border-b border-black pb-1">請求書</h1>
+          </div>
+
+          <div className="flex justify-between items-start mb-2">
+            <div className="w-1/2 pt-2">
+              <h2 className="text-xl font-bold border-b border-black pb-1 mb-8 inline-block min-w-[70%]">
+                {customer.name} <span className="text-base font-normal ml-4">御中</span>
+              </h2>
+              <p className="text-xs mb-4">下記のとおりご請求申し上げます。</p>
+              <p className="text-xs">登録番号:{companyInfo.registrationNumber}</p>
+            </div>
+            <div className="w-5/12 text-xs relative">
+              <p className="font-bold text-lg mb-1">{companyInfo.name}</p>
+              <p className="whitespace-pre-line leading-relaxed mb-1">{companyInfo.address}</p>
+              <div className="absolute right-0 top-0 w-16 h-16 border-2 border-red-500 rounded flex items-center justify-center text-red-500 opacity-60 text-xs flex-col">
+                <span className="border-b border-red-500 w-full text-center">AS</span>
+                <span className="w-full text-center">ぷらす</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end mb-1 relative">
+            <div className="w-[45%]">
+               <div className="flex justify-between text-xs mb-1">
+                 <span>請求締切日　{closingDateStr}</span>
+                 <span>P.1</span>
+               </div>
+               <div className="border-2 border-black flex items-stretch">
+                 <div className="bg-gray-100 border-r border-black flex items-center justify-center px-4 py-1">
+                   <span className="tracking-widest">合計（税込）</span>
+                 </div>
+                 <div className="flex-1 flex items-center justify-center py-1 font-bold text-lg">
+                   {formatYen(totals.grandTotal)}
+                 </div>
+               </div>
+               <div className="text-right text-xs mt-0.5">
+                 （{taxLabel} {formatYen(totals.totalTax)}）
+               </div>
+            </div>
+          </div>
+
+          <table className="w-full border-collapse border-2 border-black text-xs mb-1">
+            <thead>
+              <tr className="bg-gray-100 border-b-2 border-black">
+                <th className="border border-black py-1 px-1 w-[14%] font-normal">納品日</th>
+                <th className="border border-black py-1 px-1 w-[26%] font-normal">内容</th>
+                <th className="border border-black py-1 px-1 w-[12%] font-normal">産地</th>
+                <th className="border border-black py-1 px-1 w-[10%] font-normal">数量（個）</th>
+                <th className="border border-black py-1 px-1 w-[12%] font-normal">単価（円）</th>
+                <th className="border border-black py-1 px-1 w-[13%] font-normal">金額</th>
+                <th className="border border-black py-1 px-1 w-[13%] font-normal">消費税</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayRows.map((row, index) => {
+                if (row.type === 'item') {
+                  return (
+                    <tr key={index} className="border-b border-gray-300">
+                      <td className="border border-black py-1 px-1 text-center h-[24px]">{formatDateJP(row.date)}</td>
+                      <td className="border border-black py-1 px-1">{row.itemName}</td>
+                      <td className="border border-black py-1 px-1 text-center">{row.origin}</td>
+                      <td className="border border-black py-1 px-1 text-right">{row.quantity}</td>
+                      <td className="border border-black py-1 px-1 text-right">{row.unitPrice}</td>
+                      <td className="border border-black py-1 px-1 text-right">{formatYen(row.quantity * row.unitPrice)}</td>
+                      <td className="border border-black py-1 px-1"></td>
+                    </tr>
+                  );
+                } else if (row.type === 'daily_total') {
+                  return (
+                    <tr key={`total-${index}`} className="border-b-2 border-black bg-gray-50">
+                      <td className="border border-black py-1 px-1"></td>
+                      <td className="border border-black py-1 px-1"></td>
+                      <td className="border border-black py-1 px-1"></td>
+                      <td className="border border-black py-1 px-1 text-center font-bold" colSpan="2">【日計】</td>
+                      <td className="border border-black py-1 px-1 text-right font-bold">{formatYen(row.subtotal)}</td>
+                      <td className="border border-black py-1 px-1 text-right">{formatYen(row.tax)}</td>
+                    </tr>
+                  );
+                }
+                return null;
+              })}
+              {emptyRows.map((_, i) => (
+                <tr key={`empty-${i}`}>
+                  <td className="border border-black py-1 px-1 h-[24px]"></td>
+                  <td className="border border-black py-1 px-1"></td>
+                  <td className="border border-black py-1 px-1"></td>
+                  <td className="border border-black py-1 px-1"></td>
+                  <td className="border border-black py-1 px-1"></td>
+                  <td className="border border-black py-1 px-1"></td>
+                  <td className="border border-black py-1 px-1"></td>
+                </tr>
+              ))}
+              <tr>
+                <td className="border-t border-black py-1" colSpan="5"></td>
+                <td className="border border-black py-1 px-1 text-right">{formatYen(totals.totalSubtotal)}</td>
+                <td className="border border-black py-1 px-1 text-right">{formatYen(totals.totalTax)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="mt-4 font-bold text-sm">
+            {companyInfo.bankInfo}
+          </div>
+        </div>
+      );
+    }
+
+    // 描画の実行
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('/sw.js').then(function(registration) {
+        console.log('ServiceWorker registration successful');
+      }, function(err) {
+        console.log('ServiceWorker registration failed: ', err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
