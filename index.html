@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
   <title>納品・請求管理システム</title>
 
-  <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#317EFB">
-
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
@@ -53,7 +50,7 @@
     /* スマホ(幅が狭い画面)の場合のみ、A4用紙を縮小して全体を見やすくする */
     @media screen and (max-width: 768px) {
       .print-preview-container {
-        transform: scale(0.65); /* 画面サイズに合わせて縮小率を調整してください */
+        transform: scale(0.65); /* 画面サイズに合わせて縮小率を調整 */
         transform-origin: top left;
         margin-bottom: -100mm; /* 縮小した分の余白を詰める */
         margin-right: -70mm; 
@@ -66,7 +63,10 @@
 
   <!-- アプリケーションのコード -->
   <script type="text/babel">
-    const { useState, useMemo } = React;
+    const { useState, useEffect, useMemo } = React;
+
+    // ご自身で取得された Google Apps Script の URL
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyLlx5IDSBprMHrN_qLiqLCegGnbpcuXaQr9argmDbvK8jkU6l4vADqw02dPdPzjN_Y/exec';
 
     // --- アイコンコンポーネント (LucideのSVGを再現) ---
     const IconBase = ({ children, size = 24, className = "" }) => (
@@ -77,35 +77,22 @@
     const FileText = (p) => <IconBase {...p}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></IconBase>;
     const ListPlus = (p) => <IconBase {...p}><path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="M18 9v6"/><path d="M21 12h-6"/></IconBase>;
     const Printer = (p) => <IconBase {...p}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></IconBase>;
-    const Settings = (p) => <IconBase {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></IconBase>;
+    const SettingsIcon = (p) => <IconBase {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></IconBase>;
     const Calendar = (p) => <IconBase {...p}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></IconBase>;
     const Building2 = (p) => <IconBase {...p}><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></IconBase>;
     const Calculator = (p) => <IconBase {...p}><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></IconBase>;
     const Trash2 = (p) => <IconBase {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconBase>;
     const Plus = (p) => <IconBase {...p}><path d="M5 12h14"/><path d="M12 5v14"/></IconBase>;
+    const Loader2 = (p) => <IconBase {...p} className={`animate-spin ${p.className||''}`}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></IconBase>;
+    const Cloud = (p) => <IconBase {...p}><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></IconBase>;
 
-    // --- 初期データ（サンプル） ---
-    const initialCompanyInfo = {
+    // --- 初期データ（自社情報） ---
+    const defaultCompanyInfo = {
       name: '株式会社ASぷらす',
       address: '大阪市西区阿波座1-10-20-603\nTEL : 06-6539-5152\nFAX : 06-6539-5153\n担当 : 江崎',
       registrationNumber: 'T7120001259278',
       bankInfo: '【お振込先】 住信SBIネット銀行 法人第一支店(106) 普通2276800 カ）アスプラス',
     };
-
-    const initialCustomers = [
-      { id: 'C001', name: '有限会社播磨商店' },
-      { id: 'C002', name: '株式会社 咲天' },
-    ];
-
-    const initialDeliveries = [
-      { id: 1, date: '2026-04-06', customerId: 'C001', itemName: '養殖アユ', origin: '岐阜', quantity: 20, unitPrice: 350, taxRate: 8 },
-      { id: 2, date: '2026-04-07', customerId: 'C001', itemName: '養殖アユ', origin: '岐阜', quantity: 20, unitPrice: 350, taxRate: 8 },
-      { id: 3, date: '2026-04-09', customerId: 'C001', itemName: '養殖アユ', origin: '岐阜', quantity: 20, unitPrice: 350, taxRate: 8 },
-      { id: 4, date: '2026-04-10', customerId: 'C001', itemName: '養殖アユ', origin: '岐阜', quantity: 40, unitPrice: 350, taxRate: 8 },
-      { id: 5, date: '2026-04-02', customerId: 'C002', itemName: 'から付ホタテ', origin: '北海道', quantity: 2, unitPrice: 3500, taxRate: 8 },
-      { id: 6, date: '2026-04-02', customerId: 'C002', itemName: 'アサリ', origin: '中国', quantity: 5, unitPrice: 3500, taxRate: 8 },
-      { id: 7, date: '2026-04-02', customerId: 'C002', itemName: 'ハマグリ', origin: '千葉', quantity: 3, unitPrice: 5500, taxRate: 8 },
-    ];
 
     // --- ユーティリティ ---
     const formatYen = (amount) => {
@@ -115,20 +102,61 @@
     // --- メインコンポーネント ---
     function App() {
       const [activeTab, setActiveTab] = useState('entry');
-      const [companyInfo, setCompanyInfo] = useState(initialCompanyInfo);
-      const [customers, setCustomers] = useState(initialCustomers);
-      const [deliveries, setDeliveries] = useState(initialDeliveries);
-
       const [printDocument, setPrintDocument] = useState(null); 
+      
+      // データ状態
+      const [deliveries, setDeliveries] = useState([]);
+      const [isLoading, setIsLoading] = useState(true);
+
+      // 自社情報（ローカルストレージから読み込み、なければ初期値）
+      const [companyInfo, setCompanyInfo] = useState(() => {
+        const saved = localStorage.getItem('companyInfo');
+        return saved ? JSON.parse(saved) : defaultCompanyInfo;
+      });
+
+      // 自社情報が変更されたらローカルストレージに保存
+      useEffect(() => {
+        localStorage.setItem('companyInfo', JSON.stringify(companyInfo));
+      }, [companyInfo]);
+
+      // 初回起動時にGoogleスプレッドシートからデータを取得
+      useEffect(() => {
+        setIsLoading(true);
+        fetch(GAS_URL)
+          .then(res => res.json())
+          .then(data => {
+            // 日付の降順（新しい順）でソートしてセット
+            setDeliveries(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
+          })
+          .catch(err => {
+            console.error("データの取得に失敗しました", err);
+            alert("データの取得に失敗しました。インターネット接続を確認してください。");
+          })
+          .finally(() => setIsLoading(false));
+      }, []);
+
+      // 重複のないリストを自動生成（プルダウン用）
+      const uniqueCustomers = useMemo(() => [...new Set(deliveries.map(d => d.customerName))].filter(Boolean), [deliveries]);
+      const uniqueItemNames = useMemo(() => [...new Set(deliveries.map(d => d.itemName))].filter(Boolean), [deliveries]);
+      const uniqueOrigins = useMemo(() => [...new Set(deliveries.map(d => d.origin))].filter(Boolean), [deliveries]);
 
       const renderContent = () => {
+        if (isLoading) {
+          return (
+            <div className="flex flex-col items-center justify-center py-20 text-blue-600">
+              <Loader2 size={40} className="mb-4" />
+              <p className="text-lg font-medium">クラウドからデータを読み込み中...</p>
+            </div>
+          );
+        }
+
         switch (activeTab) {
           case 'entry':
-            return <DataEntryTab customers={customers} setCustomers={setCustomers} deliveries={deliveries} setDeliveries={setDeliveries} />;
+            return <DataEntryTab deliveries={deliveries} setDeliveries={setDeliveries} uniqueCustomers={uniqueCustomers} uniqueItemNames={uniqueItemNames} uniqueOrigins={uniqueOrigins} />;
           case 'slips':
-            return <DeliverySlipsTab deliveries={deliveries} customers={customers} onPrint={(data) => setPrintDocument({ type: 'slip', data })} />;
+            return <DeliverySlipsTab deliveries={deliveries} onPrint={(data) => setPrintDocument({ type: 'slip', data })} />;
           case 'invoices':
-            return <InvoicesTab deliveries={deliveries} customers={customers} companyInfo={companyInfo} onPrint={(data) => setPrintDocument({ type: 'invoice', data })} />;
+            return <InvoicesTab deliveries={deliveries} uniqueCustomers={uniqueCustomers} companyInfo={companyInfo} onPrint={(data) => setPrintDocument({ type: 'invoice', data })} />;
           case 'settings':
             return <SettingsTab companyInfo={companyInfo} setCompanyInfo={setCompanyInfo} />;
           default:
@@ -168,8 +196,9 @@
               <div className="flex items-center space-x-2">
                 <Calculator className="h-5 w-5 md:h-6 md:w-6 text-blue-300" />
                 <h1 className="text-lg md:text-xl font-bold truncate">納品・請求管理</h1>
+                <span className="bg-blue-800 text-[10px] px-2 py-0.5 rounded-full flex items-center ml-1 border border-blue-700"><Cloud size={10} className="mr-1"/> クラウド保存</span>
               </div>
-              <div className="text-xs md:text-sm text-blue-200 truncate ml-4 max-w-[50%]">
+              <div className="text-xs md:text-sm text-blue-200 truncate ml-4 max-w-[40%]">
                 {companyInfo.name}
               </div>
             </div>
@@ -183,12 +212,12 @@
                   <DesktopNavItem icon={<FileText />} label="納品書発行" active={activeTab === 'slips'} onClick={() => setActiveTab('slips')} />
                   <DesktopNavItem icon={<Printer />} label="請求書発行" active={activeTab === 'invoices'} onClick={() => setActiveTab('invoices')} />
                   <div className="h-px bg-slate-200 my-2"></div>
-                  <DesktopNavItem icon={<Settings />} label="設定 (自社情報)" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+                  <DesktopNavItem icon={<SettingsIcon />} label="設定 (自社情報)" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
                 </ul>
               </nav>
             </aside>
 
-            <section className="flex-1 bg-white md:rounded-lg shadow-sm border-y md:border border-slate-200 p-4 md:p-6">
+            <section className="flex-1 bg-white md:rounded-lg shadow-sm border-y md:border border-slate-200 p-4 md:p-6 min-h-[500px]">
               {renderContent()}
             </section>
           </main>
@@ -197,7 +226,7 @@
             <MobileNavItem icon={<ListPlus />} label="入力" active={activeTab === 'entry'} onClick={() => setActiveTab('entry')} />
             <MobileNavItem icon={<FileText />} label="納品書" active={activeTab === 'slips'} onClick={() => setActiveTab('slips')} />
             <MobileNavItem icon={<Printer />} label="請求書" active={activeTab === 'invoices'} onClick={() => setActiveTab('invoices')} />
-            <MobileNavItem icon={<Settings />} label="設定" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+            <MobileNavItem icon={<SettingsIcon />} label="設定" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
           </nav>
         </div>
       );
@@ -235,54 +264,65 @@
       );
     }
 
-    function DataEntryTab({ customers, setCustomers, deliveries, setDeliveries }) {
+    // --- 1. データ入力タブ ---
+    function DataEntryTab({ deliveries, setDeliveries, uniqueCustomers, uniqueItemNames, uniqueOrigins }) {
       const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
-        customerName: customers[0]?.name || '',
+        customerName: '',
         itemName: '',
         origin: '',
         quantity: 1,
         unitPrice: 0,
         taxRate: 8,
       });
-
-      // 過去の入力履歴からユニークなリストを作成
-      const uniqueItemNames = useMemo(() => {
-        return [...new Set(deliveries.map(d => d.itemName))].filter(Boolean);
-      }, [deliveries]);
-
-      const uniqueOrigins = useMemo(() => {
-        return [...new Set(deliveries.map(d => d.origin))].filter(Boolean);
-      }, [deliveries]);
+      const [isSaving, setIsSaving] = useState(false);
 
       const handleSubmit = (e) => {
         e.preventDefault();
         if (!formData.itemName || formData.quantity <= 0 || formData.unitPrice < 0 || !formData.customerName) return;
 
-        let targetCustomerId = '';
-        const existingCustomer = customers.find(c => c.name === formData.customerName);
-        if (existingCustomer) {
-          targetCustomerId = existingCustomer.id;
-        } else {
-          // 新規の顧客名が入力された場合はリストに追加
-          targetCustomerId = 'C' + Date.now();
-          setCustomers([...customers, { id: targetCustomerId, name: formData.customerName }]);
-        }
+        setIsSaving(true);
 
         const newDelivery = {
-          id: Date.now(),
+          id: Date.now(), // ユニークなIDを生成
           ...formData,
-          customerId: targetCustomerId,
           quantity: Number(formData.quantity),
           unitPrice: Number(formData.unitPrice),
           taxRate: Number(formData.taxRate),
         };
+
+        // 画面上には即座に反映（新しいものを上に）
         setDeliveries([newDelivery, ...deliveries]);
+        
+        // フォームの内容を一部リセット
         setFormData({ ...formData, itemName: '', origin: '', quantity: 1, unitPrice: 0 }); 
+
+        // Googleスプレッドシートへ送信
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' }, // CORS回避のためtext/plain
+          body: JSON.stringify({ action: 'add', data: newDelivery })
+        })
+        .then(() => setIsSaving(false))
+        .catch(err => {
+          console.error("保存エラー:", err);
+          alert("データのクラウド保存に失敗しました。");
+          setIsSaving(false);
+        });
       };
 
       const handleDelete = (id) => {
-        setDeliveries(deliveries.filter(d => d.id !== id));
+        if(!window.confirm("このデータを削除してもよろしいですか？")) return;
+        
+        // 画面上から削除
+        setDeliveries(deliveries.filter(d => String(d.id) !== String(id)));
+
+        // Googleスプレッドシートに削除依頼を送信
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'delete', id: id })
+        }).catch(err => console.error("削除エラー:", err));
       };
 
       return (
@@ -291,25 +331,25 @@
             <ListPlus className="mr-2" /> 納品データの入力
           </h2>
           
-          <form onSubmit={handleSubmit} className="bg-slate-50 p-4 md:p-5 rounded-lg border border-slate-200 mb-8">
+          <form onSubmit={handleSubmit} className="bg-slate-50 p-4 md:p-5 rounded-lg border border-slate-200 mb-8 shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">納品日</label>
-                <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+                <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">顧客</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">顧客 (入力・選択)</label>
                 <input 
                   type="text" 
                   required 
                   list="customer-list"
                   value={formData.customerName} 
                   onChange={e => setFormData({...formData, customerName: e.target.value})} 
-                  className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" 
-                  placeholder="入力または選択"
+                  placeholder="新しい顧客名を入力"
+                  className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none" 
                 />
                 <datalist id="customer-list">
-                  {customers.map(c => <option key={c.id} value={c.name} />)}
+                  {uniqueCustomers.map((name, i) => <option key={i} value={name} />)}
                 </datalist>
               </div>
               <div className="md:col-span-2">
@@ -321,7 +361,7 @@
                   value={formData.itemName} 
                   onChange={e => setFormData({...formData, itemName: e.target.value})} 
                   placeholder="例: 養殖アユ" 
-                  className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" 
+                  className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none" 
                 />
                 <datalist id="item-name-list">
                   {uniqueItemNames.map((name, i) => <option key={i} value={name} />)}
@@ -335,7 +375,7 @@
                   value={formData.origin} 
                   onChange={e => setFormData({...formData, origin: e.target.value})} 
                   placeholder="例: 岐阜" 
-                  className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" 
+                  className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none" 
                 />
                 <datalist id="origin-list">
                   {uniqueOrigins.map((origin, i) => <option key={i} value={origin} />)}
@@ -343,23 +383,24 @@
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">数量 (個)</label>
-                <input type="number" required min="1" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+                <input type="number" required min="1" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">単価 (円)</label>
-                <input type="number" required min="0" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+                <input type="number" required min="0" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">税率</label>
-                <select value={formData.taxRate} onChange={e => setFormData({...formData, taxRate: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white">
+                <select value={formData.taxRate} onChange={e => setFormData({...formData, taxRate: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
                   <option value="8">8% (軽減税率)</option>
                   <option value="10">10% (標準税率)</option>
                 </select>
               </div>
             </div>
             <div className="flex justify-end">
-              <button type="submit" className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 md:py-2 rounded-md font-bold flex items-center justify-center transition-colors">
-                <Plus size={18} className="mr-2" /> 登録する
+              <button disabled={isSaving} type="submit" className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 md:py-2 rounded-md font-bold flex items-center justify-center transition-colors disabled:bg-blue-400">
+                {isSaving ? <Loader2 size={18} className="mr-2" /> : <Plus size={18} className="mr-2" />} 
+                {isSaving ? "保存中..." : "登録する"}
               </button>
             </div>
           </form>
@@ -381,17 +422,17 @@
                 </tr>
               </thead>
               <tbody>
-                {deliveries.slice(0, 10).map((d) => (
+                {deliveries.slice(0, 20).map((d) => (
                   <tr key={d.id} className="border-b hover:bg-slate-50">
                     <td className="px-4 py-3">{d.date}</td>
-                    <td className="px-4 py-3">{customers.find(c => c.id === d.customerId)?.name}</td>
+                    <td className="px-4 py-3">{d.customerName}</td>
                     <td className="px-4 py-3">{d.itemName}</td>
                     <td className="px-4 py-3">{d.origin}</td>
                     <td className="px-4 py-3 text-right">{d.quantity}</td>
                     <td className="px-4 py-3 text-right">{formatYen(d.unitPrice)}</td>
                     <td className="px-4 py-3 text-center">{d.taxRate}%</td>
                     <td className="px-4 py-3 text-center">
-                      <button onClick={() => handleDelete(d.id)} className="text-red-500 hover:text-red-700 p-1">
+                      <button onClick={() => handleDelete(d.id)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50">
                         <Trash2 size={16} />
                       </button>
                     </td>
@@ -405,7 +446,7 @@
           </div>
 
           <div className="md:hidden space-y-3">
-            {deliveries.slice(0, 10).map((d) => (
+            {deliveries.slice(0, 20).map((d) => (
               <div key={d.id} className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm relative">
                 <div className="flex justify-between items-start mb-2">
                   <span className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-1 rounded">
@@ -416,7 +457,7 @@
                   </button>
                 </div>
                 <div className="font-bold text-slate-800 mb-1 text-sm">
-                  {customers.find(c => c.id === d.customerId)?.name}
+                  {d.customerName}
                 </div>
                 <div className="text-base text-slate-800 mb-2 font-medium">
                   {d.itemName} {d.origin && <span className="text-xs text-slate-500 ml-1 font-normal">({d.origin})</span>}
@@ -442,15 +483,16 @@
       );
     }
 
-    function DeliverySlipsTab({ deliveries, customers, onPrint }) {
+    // --- 2. 納品書発行タブ ---
+    function DeliverySlipsTab({ deliveries, onPrint }) {
       const groupedDeliveries = useMemo(() => {
         const groups = {};
         deliveries.forEach(d => {
-          const key = `${d.date}_${d.customerId}`;
+          const key = `${d.date}_${d.customerName}`;
           if (!groups[key]) {
             groups[key] = {
               date: d.date,
-              customer: customers.find(c => c.id === d.customerId),
+              customerName: d.customerName,
               items: [],
               totalAmount: 0,
               tax8: 0,
@@ -463,8 +505,9 @@
           if(d.taxRate === 8) groups[key].tax8 += lineTotal * 0.08;
           if(d.taxRate === 10) groups[key].tax10 += lineTotal * 0.1;
         });
+        // 日付の新しい順
         return Object.values(groups).sort((a, b) => new Date(b.date) - new Date(a.date));
-      }, [deliveries, customers]);
+      }, [deliveries]);
 
       return (
         <div>
@@ -482,7 +525,7 @@
                     </span>
                     <span className="text-sm text-slate-500">{group.items.length}件</span>
                   </div>
-                  <h3 className="font-bold text-lg text-slate-800 mb-1">{group.customer?.name}</h3>
+                  <h3 className="font-bold text-lg text-slate-800 mb-1">{group.customerName}</h3>
                   <p className="text-sm text-slate-600 mb-4 line-clamp-2">
                     {group.items.map(i => i.itemName).join(', ')}
                   </p>
@@ -500,14 +543,27 @@
                 </div>
               </div>
             ))}
+            {groupedDeliveries.length === 0 && (
+              <div className="col-span-2 py-8 text-center text-slate-500">
+                納品データがありません
+              </div>
+            )}
           </div>
         </div>
       );
     }
 
-    function InvoicesTab({ deliveries, customers, companyInfo, onPrint }) {
-      const [selectedCustomer, setSelectedCustomer] = useState(customers[0]?.id || '');
+    // --- 3. 請求書発行タブ ---
+    function InvoicesTab({ deliveries, uniqueCustomers, companyInfo, onPrint }) {
+      const [selectedCustomer, setSelectedCustomer] = useState('');
       
+      // 最初にお客様リストがロードされたら1番目を選択
+      useEffect(() => {
+        if (uniqueCustomers.length > 0 && !selectedCustomer) {
+          setSelectedCustomer(uniqueCustomers[0]);
+        }
+      }, [uniqueCustomers]);
+
       const today = new Date();
       const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
       const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -519,10 +575,10 @@
         if (!selectedCustomer || !startDate || !endDate) return null;
 
         const filteredItems = deliveries.filter(d => 
-          d.customerId === selectedCustomer && 
+          d.customerName === selectedCustomer && 
           d.date >= startDate && 
           d.date <= endDate
-        ).sort((a, b) => new Date(a.date) - new Date(b.date));
+        ).sort((a, b) => new Date(a.date) - new Date(b.date)); // 古い順に表示
 
         if (filteredItems.length === 0) return null;
 
@@ -543,7 +599,7 @@
         const grandTotal = totalSubtotal + totalTax;
 
         return {
-          customer: customers.find(c => c.id === selectedCustomer),
+          customerName: selectedCustomer,
           startDate,
           endDate,
           items: filteredItems,
@@ -551,7 +607,7 @@
             subtotal10, subtotal8, tax10, tax8, totalSubtotal, totalTax, grandTotal
           }
         };
-      }, [deliveries, customers, selectedCustomer, startDate, endDate]);
+      }, [deliveries, selectedCustomer, startDate, endDate]);
 
       return (
         <div>
@@ -564,17 +620,18 @@
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">顧客</label>
-                <select value={selectedCustomer} onChange={e => setSelectedCustomer(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white">
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <select value={selectedCustomer} onChange={e => setSelectedCustomer(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">選択してください</option>
+                  {uniqueCustomers.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">開始日</label>
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">終了日</label>
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white" />
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
           </div>
@@ -583,7 +640,7 @@
             <div className="border border-slate-200 rounded-lg p-4 md:p-6 bg-white shadow-sm flex flex-col items-center md:items-stretch">
               <div className="flex flex-col md:flex-row justify-between items-center w-full mb-4 md:mb-6 gap-4">
                 <div className="text-center md:text-left">
-                  <h3 className="text-lg md:text-xl font-bold text-slate-800">{invoiceData.customer.name} 御中</h3>
+                  <h3 className="text-lg md:text-xl font-bold text-slate-800">{invoiceData.customerName} 御中</h3>
                   <p className="text-sm text-slate-500 mt-2 md:mt-1">
                     ご請求金額: <span className="font-bold text-2xl md:text-xl text-blue-700 md:text-slate-800 ml-2">{formatYen(invoiceData.totals.grandTotal)}</span>
                   </p>
@@ -606,6 +663,7 @@
       );
     }
 
+    // --- 4. 設定タブ ---
     function SettingsTab({ companyInfo, setCompanyInfo }) {
       const handleChange = (e) => {
         setCompanyInfo({ ...companyInfo, [e.target.name]: e.target.value });
@@ -616,23 +674,24 @@
           <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
             <Building2 className="mr-2" /> 自社情報・設定
           </h2>
+          <p className="text-sm text-slate-500 mb-4">ここで設定した内容は、お使いの端末（ブラウザ）に自動的に保存されます。</p>
 
           <div className="space-y-4 md:space-y-5 bg-white border border-slate-200 p-4 md:p-6 rounded-lg shadow-sm">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">会社名 / 屋号</label>
-              <input type="text" name="name" value={companyInfo.name} onChange={handleChange} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm" />
+              <input type="text" name="name" value={companyInfo.name} onChange={handleChange} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">住所・連絡先など</label>
-              <textarea name="address" value={companyInfo.address} onChange={handleChange} rows="4" className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm"></textarea>
+              <textarea name="address" value={companyInfo.address} onChange={handleChange} rows="4" className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">登録番号</label>
-              <input type="text" name="registrationNumber" value={companyInfo.registrationNumber} onChange={handleChange} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm font-mono" />
+              <input type="text" name="registrationNumber" value={companyInfo.registrationNumber} onChange={handleChange} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">振込先</label>
-              <textarea name="bankInfo" value={companyInfo.bankInfo} onChange={handleChange} rows="3" className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm"></textarea>
+              <textarea name="bankInfo" value={companyInfo.bankInfo} onChange={handleChange} rows="3" className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
             </div>
           </div>
         </div>
@@ -645,8 +704,11 @@
       return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
     };
 
+    // ==========================================
+    // 印刷用コンポーネント群 (納品書)
+    // ==========================================
     function PrintableDeliverySlip({ data, companyInfo }) {
-      const { items, customer, tax8, tax10, totalAmount } = data;
+      const { items, customerName, tax8, tax10, totalAmount } = data;
       const deliveryDate = items.length > 0 ? items[0].date.split('-').slice(1).join('/') : '';
       const MIN_ROWS = 15;
       const emptyRowsCount = Math.max(0, MIN_ROWS - items.length);
@@ -661,7 +723,7 @@
           <div className="flex justify-between items-start mb-6">
             <div className="w-1/2 pt-10">
               <h2 className="text-xl font-bold border-b border-black pb-1 mb-6 inline-block min-w-[70%]">
-                {customer.name} <span className="text-base font-normal ml-4">御中</span>
+                {customerName} <span className="text-base font-normal ml-4">御中</span>
               </h2>
               <p className="mt-2">下記のとおり納品致しましたのでご査収ください</p>
             </div>
@@ -689,7 +751,7 @@
             <tbody>
               {items.map((item, index) => (
                 <tr key={index}>
-                  <td className="border border-black py-1.5 px-2 text-center">{index === 0 ? deliveryDate : ''}</td>
+                  <td className="border border-black py-1.5 px-2 text-center h-[28px]">{index === 0 ? deliveryDate : ''}</td>
                   <td className="border border-black py-1.5 px-2">{item.itemName}</td>
                   <td className="border border-black py-1.5 px-2 text-center">{item.origin}</td>
                   <td className="border border-black py-1.5 px-2 text-center">{item.quantity}</td>
@@ -739,8 +801,11 @@
       );
     }
 
+    // ==========================================
+    // 印刷用コンポーネント群 (請求書)
+    // ==========================================
     function PrintableInvoice({ data, companyInfo }) {
-      const { customer, startDate, endDate, items, totals } = data;
+      const { customerName, startDate, endDate, items, totals } = data;
       const displayRows = [];
       let currentDate = null;
       let dailySubtotal = 0;
@@ -782,7 +847,7 @@
           <div className="flex justify-between items-start mb-2">
             <div className="w-1/2 pt-2">
               <h2 className="text-xl font-bold border-b border-black pb-1 mb-8 inline-block min-w-[70%]">
-                {customer.name} <span className="text-base font-normal ml-4">御中</span>
+                {customerName} <span className="text-base font-normal ml-4">御中</span>
               </h2>
               <p className="text-xs mb-4">下記のとおりご請求申し上げます。</p>
               <p className="text-xs">登録番号:{companyInfo.registrationNumber}</p>
@@ -883,16 +948,5 @@
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
-  <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-      navigator.serviceWorker.register('/sw.js').then(function(registration) {
-        console.log('ServiceWorker registration successful');
-      }, function(err) {
-        console.log('ServiceWorker registration failed: ', err);
-      });
-    });
-  }
-</script>
 </body>
 </html>
