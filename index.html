@@ -44,15 +44,15 @@
       overflow-x: auto;
       overflow-y: auto;
       width: 100%;
-      height: calc(100vh - 120px); /* ヘッダー分を引いた高さ */
+      height: calc(100vh - 120px);
     }
 
-    /* スマホ(幅が狭い画面)の場合のみ、A4用紙を縮小して全体を見やすくする */
+    /* スマホの場合のみ、プレビューを縮小 */
     @media screen and (max-width: 768px) {
       .print-preview-container {
-        transform: scale(0.65); /* 画面サイズに合わせて縮小率を調整 */
+        transform: scale(0.65);
         transform-origin: top left;
-        margin-bottom: -100mm; /* 縮小した分の余白を詰める */
+        margin-bottom: -100mm; 
         margin-right: -70mm; 
       }
     }
@@ -104,31 +104,70 @@
       const [activeTab, setActiveTab] = useState('entry');
       const [printDocument, setPrintDocument] = useState(null); 
       
-      // データ状態
-      const [deliveries, setDeliveries] = useState([]);
-      const [isLoading, setIsLoading] = useState(true);
+      // データ状態（初期値はローカルストレージから取得、無ければ null）
+      const [deliveries, setDeliveries] = useState(() => {
+        const saved = localStorage.getItem('deliveries');
+        return saved ? JSON.parse(saved) : null;
+      });
+      const [isSyncing, setIsSyncing] = useState(false);
 
-      // 自社情報（ローカルストレージから読み込み、なければ初期値）
+      // 自社情報
       const [companyInfo, setCompanyInfo] = useState(() => {
         const saved = localStorage.getItem('companyInfo');
         return saved ? JSON.parse(saved) : defaultCompanyInfo;
       });
 
-      // 自社情報が変更されたらローカルストレージに保存
+      // 自社情報が変更されたら保存
       useEffect(() => {
         localStorage.setItem('companyInfo', JSON.stringify(companyInfo));
       }, [companyInfo]);
 
-      // 初回起動時にGoogleスプレッドシートからデータを取得
+      // deliveriesの状態監視と初期化処理
       useEffect(() => {
-        setIsLoading(true);
+        if (deliveries === null) {
+          // ★初回起動時（端末にデータが無い場合）のみクラウドから読み込む
+          setIsSyncing(true);
+          fetch(GAS_URL)
+            .then(res => res.json())
+            .then(data => {
+              const formattedData = data.map(d => {
+                let formattedDate = String(d.date);
+                if (formattedDate.includes('T')) {
+                  const dateObj = new Date(formattedDate);
+                  if (!isNaN(dateObj.getTime())) {
+                    const year = dateObj.getFullYear();
+                    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    const day = String(dateObj.getDate()).padStart(2, '0');
+                    formattedDate = `${year}-${month}-${day}`;
+                  }
+                } else if (formattedDate.includes('/')) {
+                   formattedDate = formattedDate.replace(/\//g, '-');
+                }
+                return { ...d, date: formattedDate };
+              });
+              setDeliveries(formattedData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+            })
+            .catch(err => {
+              console.error("データの取得に失敗しました", err);
+              setDeliveries([]); // エラー時は空から開始
+            })
+            .finally(() => setIsSyncing(false));
+        } else {
+          // ★2回目以降（追加・削除時）はローカルストレージに即保存
+          localStorage.setItem('deliveries', JSON.stringify(deliveries));
+        }
+      }, [deliveries]);
+
+      // 手動でクラウドと同期する関数（設定タブ用）
+      const handleSyncFromCloud = () => {
+        if(!window.confirm("クラウド（スプレッドシート）の最新データで、スマホのデータを上書きしてもよろしいですか？\n※同期していないスマホ側のデータは消去されます。")) return;
+        
+        setIsSyncing(true);
         fetch(GAS_URL)
           .then(res => res.json())
           .then(data => {
-            // スプレッドシートから取得した日付データ(ISO形式)を YYYY-MM-DD 形式に変換
             const formattedData = data.map(d => {
               let formattedDate = String(d.date);
-              // "T"が含まれるISOフォーマット(2026-05-11T15...Z)の場合
               if (formattedDate.includes('T')) {
                 const dateObj = new Date(formattedDate);
                 if (!isNaN(dateObj.getTime())) {
@@ -137,31 +176,29 @@
                   const day = String(dateObj.getDate()).padStart(2, '0');
                   formattedDate = `${year}-${month}-${day}`;
                 }
-              } 
-              // スプレッドシート上で 2026/05/10 のようになっている場合
-              else if (formattedDate.includes('/')) {
+              } else if (formattedDate.includes('/')) {
                  formattedDate = formattedDate.replace(/\//g, '-');
               }
               return { ...d, date: formattedDate };
             });
-
-            // 日付の降順（新しい順）でソートしてセット
             setDeliveries(formattedData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+            alert("クラウドからの読み込みが完了しました。");
           })
           .catch(err => {
             console.error("データの取得に失敗しました", err);
             alert("データの取得に失敗しました。インターネット接続を確認してください。");
           })
-          .finally(() => setIsLoading(false));
-      }, []);
+          .finally(() => setIsSyncing(false));
+      };
 
-      // 重複のないリストを自動生成（プルダウン用）
-      const uniqueCustomers = useMemo(() => [...new Set(deliveries.map(d => d.customerName))].filter(Boolean), [deliveries]);
-      const uniqueItemNames = useMemo(() => [...new Set(deliveries.map(d => d.itemName))].filter(Boolean), [deliveries]);
-      const uniqueOrigins = useMemo(() => [...new Set(deliveries.map(d => d.origin))].filter(Boolean), [deliveries]);
+      // 重複のないリストを自動生成（プルダウン用。nullチェック付き）
+      const safeDeliveries = deliveries || [];
+      const uniqueCustomers = useMemo(() => [...new Set(safeDeliveries.map(d => d.customerName))].filter(Boolean), [safeDeliveries]);
+      const uniqueItemNames = useMemo(() => [...new Set(safeDeliveries.map(d => d.itemName))].filter(Boolean), [safeDeliveries]);
+      const uniqueOrigins = useMemo(() => [...new Set(safeDeliveries.map(d => d.origin))].filter(Boolean), [safeDeliveries]);
 
       const renderContent = () => {
-        if (isLoading) {
+        if (isSyncing || deliveries === null) {
           return (
             <div className="flex flex-col items-center justify-center py-20 text-blue-600">
               <Loader2 size={40} className="mb-4" />
@@ -172,13 +209,13 @@
 
         switch (activeTab) {
           case 'entry':
-            return <DataEntryTab deliveries={deliveries} setDeliveries={setDeliveries} uniqueCustomers={uniqueCustomers} uniqueItemNames={uniqueItemNames} uniqueOrigins={uniqueOrigins} />;
+            return <DataEntryTab deliveries={safeDeliveries} setDeliveries={setDeliveries} uniqueCustomers={uniqueCustomers} uniqueItemNames={uniqueItemNames} uniqueOrigins={uniqueOrigins} />;
           case 'slips':
-            return <DeliverySlipsTab deliveries={deliveries} onPrint={(data) => setPrintDocument({ type: 'slip', data })} />;
+            return <DeliverySlipsTab deliveries={safeDeliveries} onPrint={(data) => setPrintDocument({ type: 'slip', data })} />;
           case 'invoices':
-            return <InvoicesTab deliveries={deliveries} uniqueCustomers={uniqueCustomers} companyInfo={companyInfo} onPrint={(data) => setPrintDocument({ type: 'invoice', data })} />;
+            return <InvoicesTab deliveries={safeDeliveries} uniqueCustomers={uniqueCustomers} companyInfo={companyInfo} onPrint={(data) => setPrintDocument({ type: 'invoice', data })} />;
           case 'settings':
-            return <SettingsTab companyInfo={companyInfo} setCompanyInfo={setCompanyInfo} />;
+            return <SettingsTab companyInfo={companyInfo} setCompanyInfo={setCompanyInfo} onSync={handleSyncFromCloud} isSyncing={isSyncing} />;
           default:
             return null;
         }
@@ -198,7 +235,6 @@
                 </button>
               </div>
             </div>
-            {/* プレビューエリア：スマホ操作用にスクロール領域を設定 */}
             <div className="preview-wrapper print:overflow-visible print:h-auto flex-1">
               <div className="print-preview-container p-10 w-[210mm] min-w-[210mm] bg-white print:p-0 print:m-0 shadow-md print:shadow-none mx-auto my-4 print:my-0 bg-white" style={{ minHeight: '297mm' }}>
                 {printDocument.type === 'slip' && <PrintableDeliverySlip data={printDocument.data} companyInfo={companyInfo} />}
@@ -284,7 +320,6 @@
       );
     }
 
-    // --- 1. データ入力タブ ---
     function DataEntryTab({ deliveries, setDeliveries, uniqueCustomers, uniqueItemNames, uniqueOrigins }) {
       const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
@@ -304,29 +339,27 @@
         setIsSaving(true);
 
         const newDelivery = {
-          id: Date.now(), // ユニークなIDを生成
+          id: Date.now(),
           ...formData,
           quantity: Number(formData.quantity),
           unitPrice: Number(formData.unitPrice),
           taxRate: Number(formData.taxRate),
         };
 
-        // 画面上には即座に反映（新しいものを上に）
+        // 画面（ローカル）には即座に反映
         setDeliveries([newDelivery, ...deliveries]);
-        
-        // フォームの内容を一部リセット
         setFormData({ ...formData, itemName: '', origin: '', quantity: 1, unitPrice: 0 }); 
 
-        // Googleスプレッドシートへ送信
+        // 裏側でGoogleスプレッドシートへ送信
         fetch(GAS_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain' }, // CORS回避のためtext/plain
+          headers: { 'Content-Type': 'text/plain' }, 
           body: JSON.stringify({ action: 'add', data: newDelivery })
         })
         .then(() => setIsSaving(false))
         .catch(err => {
           console.error("保存エラー:", err);
-          alert("データのクラウド保存に失敗しました。");
+          alert("スプレッドシートへの保存に失敗しました。\n※データはスマホ本体には正常に保存されています。");
           setIsSaving(false);
         });
       };
@@ -334,10 +367,10 @@
       const handleDelete = (id) => {
         if(!window.confirm("このデータを削除してもよろしいですか？")) return;
         
-        // 画面上から削除
+        // 画面（ローカル）から削除
         setDeliveries(deliveries.filter(d => String(d.id) !== String(id)));
 
-        // Googleスプレッドシートに削除依頼を送信
+        // 裏側でGoogleスプレッドシートに削除依頼を送信
         fetch(GAS_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
@@ -503,7 +536,6 @@
       );
     }
 
-    // --- 2. 納品書発行タブ ---
     function DeliverySlipsTab({ deliveries, onPrint }) {
       const groupedDeliveries = useMemo(() => {
         const groups = {};
@@ -525,7 +557,6 @@
           if(d.taxRate === 8) groups[key].tax8 += lineTotal * 0.08;
           if(d.taxRate === 10) groups[key].tax10 += lineTotal * 0.1;
         });
-        // 日付の新しい順
         return Object.values(groups).sort((a, b) => new Date(b.date) - new Date(a.date));
       }, [deliveries]);
 
@@ -573,11 +604,9 @@
       );
     }
 
-    // --- 3. 請求書発行タブ ---
     function InvoicesTab({ deliveries, uniqueCustomers, companyInfo, onPrint }) {
       const [selectedCustomer, setSelectedCustomer] = useState('');
       
-      // 最初にお客様リストがロードされたら1番目を選択
       useEffect(() => {
         if (uniqueCustomers.length > 0 && !selectedCustomer) {
           setSelectedCustomer(uniqueCustomers[0]);
@@ -598,7 +627,7 @@
           d.customerName === selectedCustomer && 
           d.date >= startDate && 
           d.date <= endDate
-        ).sort((a, b) => new Date(a.date) - new Date(b.date)); // 古い順に表示
+        ).sort((a, b) => new Date(a.date) - new Date(b.date));
 
         if (filteredItems.length === 0) return null;
 
@@ -683,8 +712,7 @@
       );
     }
 
-    // --- 4. 設定タブ ---
-    function SettingsTab({ companyInfo, setCompanyInfo }) {
+    function SettingsTab({ companyInfo, setCompanyInfo, onSync, isSyncing }) {
       const handleChange = (e) => {
         setCompanyInfo({ ...companyInfo, [e.target.name]: e.target.value });
       };
@@ -694,7 +722,6 @@
           <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
             <Building2 className="mr-2" /> 自社情報・設定
           </h2>
-          <p className="text-sm text-slate-500 mb-4">ここで設定した内容は、お使いの端末（ブラウザ）に自動的に保存されます。</p>
 
           <div className="space-y-4 md:space-y-5 bg-white border border-slate-200 p-4 md:p-6 rounded-lg shadow-sm">
             <div>
@@ -714,6 +741,24 @@
               <textarea name="bankInfo" value={companyInfo.bankInfo} onChange={handleChange} rows="3" className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
             </div>
           </div>
+
+          <div className="mt-8 border-t border-slate-200 pt-6">
+            <h3 className="font-bold text-slate-800 mb-3 flex items-center">
+              <Cloud className="mr-2 h-5 w-5 text-blue-600" /> クラウド連携
+            </h3>
+            <p className="text-sm text-slate-600 mb-4 leading-relaxed">
+              通常、納品データはスマホ本体に保存され、アプリの起動待ち時間はありません（登録時のみスプレッドシートへバックアップされます）。<br/>
+              パソコン等でスプレッドシートを直接編集・削除した場合は、以下のボタンを押して最新データをスマホに読み込んでください。
+            </p>
+            <button 
+              onClick={onSync}
+              disabled={isSyncing}
+              className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white px-4 py-3 md:py-2 rounded shadow text-sm font-medium flex items-center justify-center transition-colors disabled:bg-green-400"
+            >
+              {isSyncing ? <Loader2 size={18} className="mr-2" /> : <Cloud size={18} className="mr-2" />} 
+              クラウドから最新データを取得
+            </button>
+          </div>
         </div>
       );
     }
@@ -724,9 +769,6 @@
       return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
     };
 
-    // ==========================================
-    // 印刷用コンポーネント群 (納品書)
-    // ==========================================
     function PrintableDeliverySlip({ data, companyInfo }) {
       const { items, customerName, tax8, tax10, totalAmount } = data;
       const deliveryDate = items.length > 0 ? items[0].date.split('-').slice(1).join('/') : '';
@@ -821,9 +863,6 @@
       );
     }
 
-    // ==========================================
-    // 印刷用コンポーネント群 (請求書)
-    // ==========================================
     function PrintableInvoice({ data, companyInfo }) {
       const { customerName, startDate, endDate, items, totals } = data;
       const displayRows = [];
@@ -964,7 +1003,6 @@
       );
     }
 
-    // 描画の実行
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
