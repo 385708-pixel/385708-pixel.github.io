@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
   <title>納品・請求管理システム</title>
 
   <link rel="manifest" href="./manifest.json">
@@ -29,10 +29,35 @@
       @page {
         margin: 0;
       }
+      /* 印刷時は縮小を解除 */
+      .print-preview-container {
+        transform: none !important;
+        transform-origin: top left !important;
+      }
     }
+    
     /* スマホ画面下部のセーフエリア用余白 */
     .pb-safe {
       padding-bottom: env(safe-area-inset-bottom, 20px);
+    }
+
+    /* プレビュー画面のスクロールと縮小表示用（スマホ向け） */
+    .preview-wrapper {
+      -webkit-overflow-scrolling: touch;
+      overflow-x: auto;
+      overflow-y: auto;
+      width: 100%;
+      height: calc(100vh - 120px); /* ヘッダー分を引いた高さ */
+    }
+
+    /* スマホ(幅が狭い画面)の場合のみ、A4用紙を縮小して全体を見やすくする */
+    @media screen and (max-width: 768px) {
+      .print-preview-container {
+        transform: scale(0.65); /* 画面サイズに合わせて縮小率を調整してください */
+        transform-origin: top left;
+        margin-bottom: -100mm; /* 縮小した分の余白を詰める */
+        margin-right: -70mm; 
+      }
     }
   </style>
 </head>
@@ -113,20 +138,21 @@
 
       if (printDocument) {
         return (
-          <div className="bg-gray-100 min-h-screen text-gray-900 font-sans print:bg-white print:font-serif print:text-black">
-            <div className="print:hidden p-4 bg-white flex flex-col sm:flex-row justify-between items-center border-b sticky top-0 z-10 shadow-sm gap-3">
-              <p className="text-xs text-gray-600">ブラウザの印刷機能を使用して印刷してください。背景のグラフィックをオンにすると綺麗に印刷されます。</p>
-              <div className="flex space-x-3 w-full sm:w-auto">
-                <button onClick={() => window.print()} className="flex-1 sm:flex-none justify-center bg-blue-600 text-white px-4 py-3 sm:py-2 rounded shadow hover:bg-blue-700 flex items-center font-bold">
-                  <Printer size={18} className="mr-2" /> 印刷
+          <div className="bg-gray-100 min-h-screen text-gray-900 font-sans print:bg-white print:font-serif print:text-black flex flex-col h-screen">
+            <div className="print:hidden p-3 bg-white flex flex-col sm:flex-row justify-between items-center border-b shadow-sm gap-2 shrink-0">
+              <p className="text-[10px] sm:text-xs text-gray-600">画面をスワイプして全体を確認できます。ブラウザの印刷機能を使用して印刷してください。</p>
+              <div className="flex space-x-2 w-full sm:w-auto">
+                <button onClick={() => window.print()} className="flex-1 sm:flex-none justify-center bg-blue-600 text-white px-3 py-2 rounded shadow hover:bg-blue-700 flex items-center font-bold text-sm">
+                  <Printer size={16} className="mr-2" /> 印刷
                 </button>
-                <button onClick={() => setPrintDocument(null)} className="flex-1 sm:flex-none justify-center bg-gray-300 text-gray-800 px-4 py-3 sm:py-2 rounded shadow hover:bg-gray-400 font-bold">
+                <button onClick={() => setPrintDocument(null)} className="flex-1 sm:flex-none justify-center bg-gray-300 text-gray-800 px-3 py-2 rounded shadow hover:bg-gray-400 font-bold text-sm">
                   戻る
                 </button>
               </div>
             </div>
-            <div className="overflow-x-auto w-full print:overflow-visible flex justify-center">
-              <div className="p-10 w-[210mm] min-w-[210mm] bg-white print:p-0 print:m-0 shadow-md print:shadow-none my-4 print:my-0 origin-top-left" style={{ minHeight: '297mm' }}>
+            {/* プレビューエリア：スマホ操作用にスクロール領域を設定 */}
+            <div className="preview-wrapper print:overflow-visible print:h-auto flex-1">
+              <div className="print-preview-container p-10 w-[210mm] min-w-[210mm] bg-white print:p-0 print:m-0 shadow-md print:shadow-none mx-auto my-4 print:my-0 bg-white" style={{ minHeight: '297mm' }}>
                 {printDocument.type === 'slip' && <PrintableDeliverySlip data={printDocument.data} companyInfo={companyInfo} />}
                 {printDocument.type === 'invoice' && <PrintableInvoice data={printDocument.data} companyInfo={companyInfo} />}
               </div>
@@ -480,7 +506,7 @@
       return (
         <div>
           <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
-            <Printer className="mr-2" /> 請求書発行 (画像フォーマット)
+            <Printer className="mr-2" /> 請求書発行
           </h2>
           
           <div className="bg-blue-50 border border-blue-100 p-4 md:p-5 rounded-lg mb-6">
@@ -595,7 +621,6 @@
                 <p className="font-bold text-lg mb-1">{companyInfo.name}</p>
                 <p className="whitespace-pre-line mb-1 leading-relaxed">{companyInfo.address}</p>
                 <p className="mt-2 text-xs">登録番号: {companyInfo.registrationNumber}</p>
-                <div className="absolute top-12 right-0 w-16 h-16 border-2 border-red-500 rounded flex items-center justify-center text-red-500 opacity-40 text-xs">社印</div>
               </div>
             </div>
           </div>
@@ -715,10 +740,6 @@
             <div className="w-5/12 text-xs relative">
               <p className="font-bold text-lg mb-1">{companyInfo.name}</p>
               <p className="whitespace-pre-line leading-relaxed mb-1">{companyInfo.address}</p>
-              <div className="absolute right-0 top-0 w-16 h-16 border-2 border-red-500 rounded flex items-center justify-center text-red-500 opacity-60 text-xs flex-col">
-                <span className="border-b border-red-500 w-full text-center">AS</span>
-                <span className="w-full text-center">ぷらす</span>
-              </div>
             </div>
           </div>
 
