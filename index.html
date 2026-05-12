@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
   <title>納品・請求管理システム</title>
 
+  <!-- ★PWA用: manifest.json の読み込み（キャッシュ対策で?v=2を付与） -->
+  <link rel="manifest" href="./manifest.json?v=2">
+  <meta name="theme-color" content="#1e3a8a">
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
@@ -15,7 +19,8 @@
   <!-- Babel (ブラウザ上でJSXをコンパイル) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
-　<link rel="apple-touch-icon" href="./images/icon.png">
+  <!-- iPhone用アイコン（キャッシュ対策で?v=2を付与） -->
+  <link rel="apple-touch-icon" href="./images/icon.png?v=2">
   
   <style>
     /* 印刷時のスタイル調整 */
@@ -1007,6 +1012,19 @@
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
+  </script>
+
+  <!-- ★PWA用: Service Workerの登録 -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('./sw.js').then(function(registration) {
+          console.log('ServiceWorker registration successful');
+        }, function(err) {
+          console.log('ServiceWorker registration failed: ', err);
+        });
+      });
+    }
   </script>
 </body>
 </html>
