@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -51,16 +51,17 @@
       overflow-x: auto;
       overflow-y: auto;
       width: 100%;
-      height: calc(100vh - 120px);
     }
 
     /* スマホの場合のみ、プレビューを縮小 */
     @media screen and (max-width: 768px) {
       .print-preview-container {
-        transform: scale(0.65);
+        /* スマホ画面にすっぽり収まるサイズにさらに縮小 */
+        transform: scale(0.45);
         transform-origin: top left;
-        margin-bottom: -100mm; 
-        margin-right: -70mm; 
+        /* 縮小した分の余白を詰める */
+        margin-bottom: -163mm; 
+        margin-right: -115mm; 
       }
     }
   </style>
@@ -230,9 +231,9 @@
 
       if (printDocument) {
         return (
-          <div className="bg-gray-100 min-h-screen text-gray-900 font-sans print:bg-white print:font-serif print:text-black flex flex-col h-screen">
-            <div className="print:hidden p-3 bg-white flex flex-col sm:flex-row justify-between items-center border-b shadow-sm gap-2 shrink-0">
-              <p className="text-[10px] sm:text-xs text-gray-600">画面をスワイプして全体を確認できます。ブラウザの印刷機能を使用して印刷してください。</p>
+          <div className="bg-gray-100 min-h-screen text-gray-900 font-sans print:bg-white print:font-serif print:text-black">
+            <div className="print:hidden p-3 bg-white flex flex-col sm:flex-row justify-between items-center border-b shadow-sm gap-2 sticky top-0 z-50">
+              <p className="text-[10px] sm:text-xs text-gray-600">指で広げて拡大（ピンチアウト）できます。<br className="md:hidden"/>印刷時はブラウザのメニュー等から印刷を選んでください。</p>
               <div className="flex space-x-2 w-full sm:w-auto">
                 <button onClick={() => window.print()} className="flex-1 sm:flex-none justify-center bg-blue-600 text-white px-3 py-2 rounded shadow hover:bg-blue-700 flex items-center font-bold text-sm">
                   <Printer size={16} className="mr-2" /> 印刷
@@ -242,8 +243,10 @@
                 </button>
               </div>
             </div>
-            <div className="preview-wrapper print:overflow-visible print:h-auto flex-1">
-              <div className="print-preview-container p-10 w-[210mm] min-w-[210mm] bg-white print:p-0 print:m-0 shadow-md print:shadow-none mx-auto my-4 print:my-0 bg-white" style={{ minHeight: '297mm' }}>
+            
+            {/* 画面全体でスクロール・ズームできるように変更 */}
+            <div className="preview-wrapper print:overflow-visible flex justify-center p-2 sm:p-4">
+              <div className="print-preview-container p-10 w-[210mm] min-w-[210mm] bg-white print:p-0 print:m-0 shadow-md print:shadow-none mx-auto print:my-0 origin-top-left" style={{ minHeight: '297mm' }}>
                 {printDocument.type === 'slip' && <PrintableDeliverySlip data={printDocument.data} companyInfo={companyInfo} />}
                 {printDocument.type === 'invoice' && <PrintableInvoice data={printDocument.data} companyInfo={companyInfo} />}
               </div>
@@ -789,20 +792,21 @@
 
       return (
         <div className="text-[13px] leading-snug tracking-wider">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold tracking-[0.5em] inline-block border-b border-black pb-1">納品書</h1>
+          </div>
+
           <div className="flex justify-between items-start mb-6">
-            <div className="w-1/2 pt-10">
-              <h2 className="text-xl font-bold border-b border-black pb-1 mb-6 inline-block min-w-[70%]">
+            <div className="w-1/2 pt-2">
+              <h2 className="text-xl font-bold border-b border-black pb-1 mb-8 inline-block min-w-[70%]">
                 {customerName} <span className="text-base font-normal ml-4">御中</span>
               </h2>
-              <p className="mt-2">下記のとおり納品致しましたのでご査収ください</p>
+              <p className="text-xs mb-4">下記のとおり納品致しましたのでご査収ください</p>
             </div>
-            <div className="w-5/12 text-right relative">
-              <h1 className="text-2xl font-bold tracking-[0.5em] mb-4 text-center mr-8">納品書</h1>
-              <div className="text-left inline-block">
-                <p className="font-bold text-lg mb-1">{companyInfo.name}</p>
-                <p className="whitespace-pre-line mb-1 leading-relaxed">{companyInfo.address}</p>
-                <p className="mt-2 text-xs">登録番号: {companyInfo.registrationNumber}</p>
-              </div>
+            <div className="w-5/12 text-xs relative">
+              <p className="font-bold text-lg mb-1">{companyInfo.name}</p>
+              <p className="whitespace-pre-line leading-relaxed mb-1">{companyInfo.address}</p>
+              <p className="text-xs mt-2">登録番号:{companyInfo.registrationNumber}</p>
             </div>
           </div>
 
