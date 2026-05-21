@@ -1,4 +1,4 @@
-
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -51,17 +51,20 @@
       overflow-x: auto;
       overflow-y: auto;
       width: 100%;
+      display: flex;
+      justify-content: center;
     }
 
     /* スマホの場合のみ、プレビューを縮小 */
     @media screen and (max-width: 768px) {
       .print-preview-container {
-        /* スマホ画面にすっぽり収まるサイズにさらに縮小 */
+        /* スマホ画面にすっぽり収まるサイズに縮小 */
         transform: scale(0.45);
-        transform-origin: top left;
-        /* 縮小した分の余白を詰める */
+        transform-origin: top center !important; /* 中央を起点にする */
+        /* 縮小した分の透明な余白を詰めて中央に配置 */
         margin-bottom: -163mm; 
-        margin-right: -115mm; 
+        margin-left: -58mm; 
+        margin-right: -58mm; 
       }
     }
   </style>
@@ -231,8 +234,8 @@
 
       if (printDocument) {
         return (
-          <div className="bg-gray-100 min-h-screen text-gray-900 font-sans print:bg-white print:font-serif print:text-black">
-            <div className="print:hidden p-3 bg-white flex flex-col sm:flex-row justify-between items-center border-b shadow-sm gap-2 sticky top-0 z-50">
+          <div className="bg-gray-100 min-h-screen text-gray-900 font-sans print:bg-white print:font-serif print:text-black flex flex-col h-screen">
+            <div className="print:hidden p-3 bg-white flex flex-col sm:flex-row justify-between items-center border-b shadow-sm gap-2 shrink-0 z-50">
               <p className="text-[10px] sm:text-xs text-gray-600">指で広げて拡大（ピンチアウト）できます。<br className="md:hidden"/>印刷時はブラウザのメニュー等から印刷を選んでください。</p>
               <div className="flex space-x-2 w-full sm:w-auto">
                 <button onClick={() => window.print()} className="flex-1 sm:flex-none justify-center bg-blue-600 text-white px-3 py-2 rounded shadow hover:bg-blue-700 flex items-center font-bold text-sm">
@@ -245,8 +248,8 @@
             </div>
             
             {/* 画面全体でスクロール・ズームできるように変更 */}
-            <div className="preview-wrapper print:overflow-visible flex justify-center p-2 sm:p-4">
-              <div className="print-preview-container p-10 w-[210mm] min-w-[210mm] bg-white print:p-0 print:m-0 shadow-md print:shadow-none mx-auto print:my-0 origin-top-left" style={{ minHeight: '297mm' }}>
+            <div className="preview-wrapper print:overflow-visible flex-1 p-2 sm:p-4">
+              <div className="print-preview-container p-10 w-[210mm] min-w-[210mm] bg-white print:p-0 print:m-0 shadow-md print:shadow-none mx-auto print:my-0" style={{ minHeight: '297mm' }}>
                 {printDocument.type === 'slip' && <PrintableDeliverySlip data={printDocument.data} companyInfo={companyInfo} />}
                 {printDocument.type === 'invoice' && <PrintableInvoice data={printDocument.data} companyInfo={companyInfo} />}
               </div>
