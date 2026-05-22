@@ -1,4 +1,4 @@
-
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -31,19 +31,20 @@
         background-color: white !important;
       }
       @page {
-        size: A4 portrait; /* 印刷サイズをA4縦に指定 */
-        margin: 0;
-      }
-      /* 印刷時はスマホ用の縮小設定をすべてリセット */
-      .print-preview-wrapper {
-        display: block !important;
-        width: auto !important;
-        height: auto !important;
+        size: A4 portrait; 
+        /* プリンタの印字不可領域を考慮して上下左右に少し余白を設ける */
+        margin: 5mm; 
       }
       .print-preview-container {
-        transform: none !important;
         width: 100% !important;
-        height: 100% !important;
+        min-height: auto !important;
+        box-shadow: none !important;
+      }
+      .preview-scroll-area {
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+        display: block !important;
       }
     }
     
@@ -55,46 +56,31 @@
     /* プレビュー画面のスクロール用外枠 */
     .preview-scroll-area {
       -webkit-overflow-scrolling: touch;
-      overflow-x: auto;
-      overflow-y: auto;
+      overflow: auto;
       width: 100%;
       height: 100%;
       background-color: #f3f4f6; /* bg-gray-100 */
+      /* 中央寄せ */
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
     }
 
-    /* 縮小表示のための計算用ラッパー */
-    /* A4の比率(1:1.414)を保ちつつ、スマホの画面幅に合わせて縮小するための魔法の箱 */
-    .print-preview-wrapper {
-      position: relative;
-      margin: 16px auto;
-      /* スマホ等で画面幅よりA4サイズ(約794px)が大きい場合に縮小させる */
-      width: min(210mm, 100%); 
-      /* A4の縦横比（297/210 = 約1.414）を使って高さを自動計算 */
-      aspect-ratio: 1 / 1.414;
+    /* 実際のA4サイズの書類の枠 */
+    .print-preview-container {
+      width: 210mm;
+      min-height: 297mm;
+      box-sizing: border-box;
       background-color: white;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
 
-    /* 実際のA4サイズの書類（この中身は常にA4固定サイズで作る） */
-    .print-preview-container {
-      position: absolute;
-      top: 0;
-      left: 0;
-      /* 中身の部品はA4サイズとして絶対的なミリ数で配置する */
-      width: 210mm;
-      height: 297mm;
-      box-sizing: border-box;
-      background-color: white;
-      
-      /* 親枠(wrapper)の幅に合わせて、中身(container)全体を自動的に縮小するCSS関数 */
-      /* cqi は container query の単位。wrapperの幅に対する割合になる */
-      transform: scale(calc(100cqi / 793.7)); /* 210mm ≒ 793.7px */
-      transform-origin: top left;
-    }
-    
-    /* CSSコンテナクエリを有効にする */
-    .print-preview-wrapper {
-      container-type: inline-size;
+    /* スマホ画面での縮小表示 */
+    @media screen and (max-width: 768px) {
+      .print-preview-container {
+        /* スマホ画面幅に合わせて綺麗に縮小表示し、ピンチズームも有効にする */
+        zoom: calc(96vw / 794);
+      }
     }
   </style>
 </head>
@@ -276,10 +262,11 @@
               </div>
             </div>
             
-            {/* 新しい計算式を使ったスクロールエリア */}
-            <div className="preview-scroll-area print:overflow-visible">
-              <div className="print-preview-wrapper print:m-0 print:shadow-none">
-                <div className="print-preview-container p-10 print:p-0">
+            {/* シンプルなスクロールエリアに変更 */}
+            <div className="preview-scroll-area print:overflow-visible p-4 sm:p-8">
+              <div className="print-preview-container">
+                {/* 印刷時も少し余白を持たせて見切れを防ぐ */}
+                <div className="p-8 sm:p-10 print:p-8">
                   {printDocument.type === 'slip' && <PrintableDeliverySlip data={printDocument.data} companyInfo={companyInfo} />}
                   {printDocument.type === 'invoice' && <PrintableInvoice data={printDocument.data} companyInfo={companyInfo} />}
                 </div>
