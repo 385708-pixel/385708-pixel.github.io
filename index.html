@@ -19,76 +19,57 @@
   <!-- Babel (ブラウザ上でJSXをコンパイル) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
-  <!-- iPhone用アイコン（キャッシュ対策で?v=2を付与） -->
-  <link rel="apple-touch-icon" href="./images/icon.png?v=2">
-  
   <style>
-    /* 印刷時のスタイル調整 */
     @media print {
-      body {
+      html, body {
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+        padding: 0;
+        background-color: white !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
-        background-color: white !important;
       }
       @page {
-        size: A4 portrait; 
+        size: A4 portrait;
+        margin: 0; /* ブラウザのマージンを消し、A4用紙に100%フィットさせる */
       }
       .print-preview-container {
-        width: stretch !important;
-        min-height: auto !important;
+        width: 210mm !important;
+        height: 297mm !important;
         box-shadow: none !important;
+        transform: scale(1) !important;
+        position: static !important;
+        margin: 0 !important;
+        page-break-after: avoid;
+        page-break-inside: avoid;
       }
-      .preview-scroll-area {
-        overflow: visible !important;
-        height: auto !important;
-        padding: 0 !important;
-        display: block !important;
+      .print-wrapper-box {
+        width: 210mm !important;
+        height: 297mm !important;
       }
-      /* 印刷時は縮小を解除 */
-      .print-preview-container {
-        transform: none !important;
-        transform-origin: top left !important;
-      }
+      .print\:hidden { display: none !important; }
     }
     
     /* スマホ画面下部のセーフエリア用余白 */
-    .pb-safe {
-      padding-bottom: env(safe-area-inset-bottom, 20px);
-    }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
 
-    /* プレビュー画面のスクロールと縮小表示用（スマホ向け） */
-    .preview-wrapper {
-      -webkit-overflow-scrolling: touch;
-      overflow-x: auto;
-      overflow-y: auto;
-      width: 100%;
-      aspect-ratio: 1 / 1.414;
-      display: flex;
-      justify-content: center;
-    }
-
-    /* スマホの場合のみ、プレビューを縮小 */
-    @media screen and (max-width: 768px) {
-      .print-preview-container {
-        /* スマホ画面にすっぽり収まるサイズに縮小 */
-        transform: scale(0.45);
-        transform-origin: top center !important; /* 中央を起点にする */
-        /* 縮小した分の透明な余白を詰めて中央に配置 */
-        margin-bottom: -163mm; 
-        margin-left: -58mm; 
-        margin-right: -58mm; 
-      }
+    /* プレビューエリアの実寸A4定義 */
+    .print-preview-container {
+      width: 210mm;
+      height: 297mm;
+      background-color: white;
+      box-shadow: 0 0 15px rgba(0,0,0,0.15);
+      transform-origin: top left;
+      flex-shrink: 0;
     }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
   <div id="root"></div>
 
-  <!-- アプリケーションのコード -->
   <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
-
-    // ご自身で取得された Google Apps Script の URL
+    const { useState, useEffect, useRef, useMemo } = React;
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbyLlx5IDSBprMHrN_qLiqLCegGnbpcuXaQr9argmDbvK8jkU6l4vADqw02dPdPzjN_Y/exec';
 
     // --- アイコンコンポーネント (LucideのSVGを再現) ---
@@ -122,33 +103,87 @@
       return '¥' + new Intl.NumberFormat('ja-JP').format(amount);
     };
 
-    // --- メインコンポーネント ---
+    function useA4Scale() {
+      const containerRef = useRef(null);
+      const [scale, setScale] = useState(1);
+
+      useEffect(() => {
+        const updateScale = () => {
+          // 画面幅の92%に合わせて縮小（左右に少しグレーの余白を残す）
+          const containerWidth = window.innerWidth * 0.92;
+          const a4Width = 210 * 3.779527; // mm を px に変換
+          setScale(Math.min(1, containerWidth / a4Width));
+        };
+        window.addEventListener('resize', updateScale);
+        updateScale();
+        return () => window.removeEventListener('resize', updateScale);
+      }, []);
+      return { containerRef, scale };
+    }
+
+    function PrintPreview({ type, data, companyInfo, onClose }) {
+      const { containerRef, scale } = useA4Scale();
+      
+      const a4WidthPx = 210 * 3.779527;
+      const a4HeightPx = 297 * 3.779527;
+
+      return (
+        <div className="min-h-screen flex flex-col bg-[#e5e7eb]">
+          <div className="bg-white p-3 flex justify-between items-center border-b shadow-md sticky top-0 z-50 print:hidden">
+            <p className="text-[10px] sm:text-xs text-gray-600">指で広げて拡大（ピンチアウト）できます。<br className="md:hidden"/>印刷時はブラウザのメニュー等から印刷を選んでください。</p>
+            <div className="flex space-x-2 w-full sm:w-auto justify-end">
+              <button onClick={() => window.print()} className="bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm shadow flex items-center">
+                <Printer size={16} className="mr-2" /> 印刷
+              </button>
+              <button onClick={onClose} className="bg-gray-500 text-white px-4 py-2 rounded font-bold text-sm shadow">
+                戻る
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex-1 flex justify-center py-6 print:py-0 overflow-visible">
+            {/* スケール後の実寸サイズを確保するラッパー */}
+            <div 
+              className="print-wrapper-box relative print:w-[210mm] print:h-[297mm]"
+              style={{ width: `${a4WidthPx * scale}px`, height: `${a4HeightPx * scale}px` }}
+            >
+              <div 
+                ref={containerRef} 
+                className="print-preview-container absolute top-0 left-0" 
+                style={{ transform: `scale(${scale})` }}
+              >
+                {/* 用紙内の余白 (25mm) を確保し、はみ出しを防ぐ */}
+                <div className="p-[25mm] w-full h-full box-border">
+                  {type === 'slip' ? <PrintableDeliverySlip data={data} companyInfo={companyInfo} /> : <PrintableInvoice data={data} companyInfo={companyInfo} />}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     function App() {
       const [activeTab, setActiveTab] = useState('entry');
       const [printDocument, setPrintDocument] = useState(null); 
       
-      // データ状態（初期値はローカルストレージから取得、無ければ null）
       const [deliveries, setDeliveries] = useState(() => {
         const saved = localStorage.getItem('deliveries');
         return saved ? JSON.parse(saved) : null;
       });
       const [isSyncing, setIsSyncing] = useState(false);
 
-      // 自社情報
       const [companyInfo, setCompanyInfo] = useState(() => {
         const saved = localStorage.getItem('companyInfo');
         return saved ? JSON.parse(saved) : defaultCompanyInfo;
       });
 
-      // 自社情報が変更されたら保存
       useEffect(() => {
         localStorage.setItem('companyInfo', JSON.stringify(companyInfo));
       }, [companyInfo]);
 
-      // deliveriesの状態監視と初期化処理
       useEffect(() => {
         if (deliveries === null) {
-          // ★初回起動時（端末にデータが無い場合）のみクラウドから読み込む
           setIsSyncing(true);
           fetch(GAS_URL)
             .then(res => res.json())
@@ -172,16 +207,14 @@
             })
             .catch(err => {
               console.error("データの取得に失敗しました", err);
-              setDeliveries([]); // エラー時は空から開始
+              setDeliveries([]);
             })
             .finally(() => setIsSyncing(false));
         } else {
-          // ★2回目以降（追加・削除時）はローカルストレージに即保存
           localStorage.setItem('deliveries', JSON.stringify(deliveries));
         }
       }, [deliveries]);
 
-      // 手動でクラウドと同期する関数（設定タブ用）
       const handleSyncFromCloud = () => {
         if(!window.confirm("クラウド（スプレッドシート）の最新データで、スマホのデータを上書きしてもよろしいですか？\n※同期していないスマホ側のデータは消去されます。")) return;
         
@@ -214,11 +247,22 @@
           .finally(() => setIsSyncing(false));
       };
 
-      // 重複のないリストを自動生成（プルダウン用。nullチェック付き）
       const safeDeliveries = deliveries || [];
       const uniqueCustomers = useMemo(() => [...new Set(safeDeliveries.map(d => d.customerName))].filter(Boolean), [safeDeliveries]);
       const uniqueItemNames = useMemo(() => [...new Set(safeDeliveries.map(d => d.itemName))].filter(Boolean), [safeDeliveries]);
       const uniqueOrigins = useMemo(() => [...new Set(safeDeliveries.map(d => d.origin))].filter(Boolean), [safeDeliveries]);
+
+      // 印刷時は PrintPreview のみを返す
+      if (printDocument) {
+        return (
+          <PrintPreview 
+            type={printDocument.type} 
+            data={printDocument.data} 
+            companyInfo={companyInfo} 
+            onClose={() => setPrintDocument(null)} 
+          />
+        );
+      }
 
       const renderContent = () => {
         if (isSyncing || deliveries === null) {
@@ -259,11 +303,14 @@
               </div>
             </div>
             
-            {/* 画面全体でスクロール・ズームできるように変更 */}
-            <div className="preview-wrapper print:overflow-visible flex-1 p-2 sm:p-4">
-              <div className="print-preview-container p-10 w-[210mm] min-w-[210mm] bg-white print:p-0 print:m-0 shadow-md print:shadow-none mx-auto print:my-0" style={{ minHeight: '297mm' }}>
-                {printDocument.type === 'slip' && <PrintableDeliverySlip data={printDocument.data} companyInfo={companyInfo} />}
-                {printDocument.type === 'invoice' && <PrintableInvoice data={printDocument.data} companyInfo={companyInfo} />}
+            {/* シンプルなスクロールエリアに変更 */}
+            <div className="preview-scroll-area print:overflow-visible p-4 sm:p-8">
+              <div className="print-preview-container">
+                {/* 印刷時も少し余白を持たせて見切れを防ぐ */}
+                <div className="p-8 sm:p-10 print:p-8">
+                  {printDocument.type === 'slip' && <PrintableDeliverySlip data={printDocument.data} companyInfo={companyInfo} />}
+                  {printDocument.type === 'invoice' && <PrintableInvoice data={printDocument.data} companyInfo={companyInfo} />}
+                </div>
               </div>
             </div>
           </div>
@@ -1046,5 +1093,4 @@
     }
   </script>
 </body>
-</html>
 </html>
