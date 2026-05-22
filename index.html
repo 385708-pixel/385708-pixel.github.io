@@ -31,7 +31,20 @@
         background-color: white !important;
       }
       @page {
-        margin: 0;
+        size: A4 portrait; 
+        /* プリンタの印字不可領域を考慮して上下左右に少し余白を設ける */
+        margin: 5mm; 
+      }
+      .print-preview-container {
+        width: 100% !important;
+        min-height: auto !important;
+        box-shadow: none !important;
+      }
+      .preview-scroll-area {
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+        display: block !important;
       }
       /* 印刷時は縮小を解除 */
       .print-preview-container {
