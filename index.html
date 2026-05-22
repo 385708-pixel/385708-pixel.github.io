@@ -31,20 +31,12 @@
         background-color: white !important;
       }
       @page {
-        size: A4 portrait; 
-        /* プリンタの印字不可領域を考慮して上下左右に少し余白を設ける */
-        margin: 5mm; 
+        margin: 0;
       }
+      /* 印刷時は縮小を解除 */
       .print-preview-container {
-        width: 100% !important;
-        min-height: auto !important;
-        box-shadow: none !important;
-      }
-      .preview-scroll-area {
-        overflow: visible !important;
-        height: auto !important;
-        padding: 0 !important;
-        display: block !important;
+        transform: none !important;
+        transform-origin: top left !important;
       }
     }
     
@@ -53,33 +45,26 @@
       padding-bottom: env(safe-area-inset-bottom, 20px);
     }
 
-    /* プレビュー画面のスクロール用外枠 */
-    .preview-scroll-area {
+    /* プレビュー画面のスクロールと縮小表示用（スマホ向け） */
+    .preview-wrapper {
       -webkit-overflow-scrolling: touch;
-      overflow: auto;
+      overflow-x: auto;
+      overflow-y: auto;
       width: 100%;
-      height: 100%;
-      background-color: #f3f4f6; /* bg-gray-100 */
-      /* 中央寄せ */
       display: flex;
       justify-content: center;
-      align-items: flex-start;
     }
 
-    /* 実際のA4サイズの書類の枠 */
-    .print-preview-container {
-      width: 210mm;
-      min-height: 297mm;
-      box-sizing: border-box;
-      background-color: white;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-
-    /* スマホ画面での縮小表示 */
+    /* スマホの場合のみ、プレビューを縮小 */
     @media screen and (max-width: 768px) {
       .print-preview-container {
-        /* スマホ画面幅に合わせて綺麗に縮小表示し、ピンチズームも有効にする */
-        zoom: calc(96vw / 794);
+        /* スマホ画面にすっぽり収まるサイズに縮小 */
+        transform: scale(0.45);
+        transform-origin: top center !important; /* 中央を起点にする */
+        /* 縮小した分の透明な余白を詰めて中央に配置 */
+        margin-bottom: -163mm; 
+        margin-left: -58mm; 
+        margin-right: -58mm; 
       }
     }
   </style>
@@ -262,14 +247,11 @@
               </div>
             </div>
             
-            {/* シンプルなスクロールエリアに変更 */}
-            <div className="preview-scroll-area print:overflow-visible p-4 sm:p-8">
-              <div className="print-preview-container">
-                {/* 印刷時も少し余白を持たせて見切れを防ぐ */}
-                <div className="p-8 sm:p-10 print:p-8">
-                  {printDocument.type === 'slip' && <PrintableDeliverySlip data={printDocument.data} companyInfo={companyInfo} />}
-                  {printDocument.type === 'invoice' && <PrintableInvoice data={printDocument.data} companyInfo={companyInfo} />}
-                </div>
+            {/* 画面全体でスクロール・ズームできるように変更 */}
+            <div className="preview-wrapper print:overflow-visible flex-1 p-2 sm:p-4">
+              <div className="print-preview-container p-10 w-[210mm] min-w-[210mm] bg-white print:p-0 print:m-0 shadow-md print:shadow-none mx-auto print:my-0" style={{ minHeight: '297mm' }}>
+                {printDocument.type === 'slip' && <PrintableDeliverySlip data={printDocument.data} companyInfo={companyInfo} />}
+                {printDocument.type === 'invoice' && <PrintableInvoice data={printDocument.data} companyInfo={companyInfo} />}
               </div>
             </div>
           </div>
