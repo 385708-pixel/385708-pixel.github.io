@@ -859,7 +859,7 @@
                     <h2 className="text-xl font-bold border-b border-black pb-1 mb-8 inline-block min-w-[70%]">
                       {customerName} <span className="text-base font-normal ml-4">御中</span>
                     </h2>
-                    <p className="text-xs mb-4">下記のとおり納品致しましたのでご査収ください</p>
+                    <p className="text-xs mb-4">下記のとおり納品致しましたのでご査収ください。</p>
                   </div>
                   <div className="w-5/12 text-xs relative">
                     <p className="font-bold text-lg mb-1">{companyInfo.name}</p>
@@ -882,7 +882,9 @@
                   <tbody>
                     {items.map((item, index) => (
                       <tr key={index}>
-                        <td className="border border-black py-1.5 px-2 text-center h-[28px]">{index === 0 ? deliveryDate : ''}</td>
+                        <td className="border border-black py-1.5 px-2 text-center h-[28px] whitespace-nowrap">
+ 　　　　　　　　　　　　　 {index === 0 ? deliveryDate : ''}
+　　　　　　　　　　　　　</td>
                         <td className="border border-black py-1.5 px-2">{item.itemName}</td>
                         <td className="border border-black py-1.5 px-2 text-center">{item.origin}</td>
                         <td className="border border-black py-1.5 px-2 text-center">{item.quantity}</td>
