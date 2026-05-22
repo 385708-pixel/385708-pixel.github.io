@@ -21,32 +21,46 @@
   
   <style>
     @media print {
-      html, body {
-        width: 210mm;
-        height: 297mm;
-        margin: 0;
-        padding: 0;
+      html, body, #root {
+        width: 210mm !important;
+        height: 296mm !important; /* A4の高さから1mmだけ削り、白紙の2枚目を防止 */
+        max-height: 296mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
         background-color: white !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+        overflow: hidden !important; /* はみ出しを強制カット */
       }
       @page {
         size: A4 portrait;
-        margin: 0; /* ブラウザのマージンを消し、A4用紙に100%フィットさせる */
+        margin: 0;
       }
       .print-preview-container {
         width: 210mm !important;
-        height: 297mm !important;
+        height: 296mm !important;
+        max-height: 296mm !important;
         box-shadow: none !important;
         transform: scale(1) !important;
         position: static !important;
         margin: 0 !important;
+        overflow: hidden !important;
         page-break-after: avoid;
         page-break-inside: avoid;
       }
       .print-wrapper-box {
         width: 210mm !important;
-        height: 297mm !important;
+        height: 296mm !important;
+        position: static !important;
+        transform: none !important;
+      }
+      .preview-scroll-area {
+        overflow: visible !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        height: auto !important;
+        display: block !important;
+        background: white !important;
       }
       .print\:hidden { display: none !important; }
     }
@@ -104,25 +118,37 @@
     };
 
     function useA4Scale() {
-      const containerRef = useRef(null);
-      const [scale, setScale] = useState(1);
+      // 起動直後から画面幅に合わせて縮小率を計算する
+      const getScale = () => {
+        if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+          // 画面幅の95%に合わせる（左右に少しグレーの余白を残す）
+          const containerWidth = document.documentElement.clientWidth * 0.95;
+          const a4Width = 210 * 3.779527; // mm を px に変換
+          return Math.min(1, containerWidth / a4Width);
+        }
+        return 1;
+      };
+
+      const [scale, setScale] = useState(getScale());
 
       useEffect(() => {
         const updateScale = () => {
-          // 画面幅の92%に合わせて縮小（左右に少しグレーの余白を残す）
-          const containerWidth = window.innerWidth * 0.92;
-          const a4Width = 210 * 3.779527; // mm を px に変換
-          setScale(Math.min(1, containerWidth / a4Width));
+          setScale(getScale());
         };
         window.addEventListener('resize', updateScale);
-        updateScale();
-        return () => window.removeEventListener('resize', updateScale);
+        // スマホの回転などに対応
+        window.addEventListener('orientationchange', () => setTimeout(updateScale, 100));
+        return () => {
+          window.removeEventListener('resize', updateScale);
+          window.removeEventListener('orientationchange', updateScale);
+        };
       }, []);
-      return { containerRef, scale };
+      
+      return scale;
     }
 
     function PrintPreview({ type, data, companyInfo, onClose }) {
-      const { containerRef, scale } = useA4Scale();
+      const scale = useA4Scale();
       
       const a4WidthPx = 210 * 3.779527;
       const a4HeightPx = 297 * 3.779527;
@@ -130,7 +156,7 @@
       return (
         <div className="min-h-screen flex flex-col bg-[#e5e7eb]">
           <div className="bg-white p-3 flex justify-between items-center border-b shadow-md sticky top-0 z-50 print:hidden">
-            <p className="text-[10px] sm:text-xs text-gray-600">指で広げて拡大（ピンチアウト）できます。<br className="md:hidden"/>印刷時はブラウザのメニュー等から印刷を選んでください。</p>
+            <p className="text-[10px] sm:text-xs text-gray-600">画面幅に合わせて自動縮小表示されます。<br className="md:hidden"/>印刷時はブラウザのメニューから印刷を選んでください。</p>
             <div className="flex space-x-2 w-full sm:w-auto justify-end">
               <button onClick={() => window.print()} className="bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm shadow flex items-center">
                 <Printer size={16} className="mr-2" /> 印刷
@@ -141,19 +167,18 @@
             </div>
           </div>
           
-          <div className="flex-1 flex justify-center py-6 print:py-0 overflow-visible">
+          <div className="preview-scroll-area flex-1 overflow-auto flex justify-center items-start py-6 print:py-0 print:overflow-hidden">
             {/* スケール後の実寸サイズを確保するラッパー */}
             <div 
-              className="print-wrapper-box relative print:w-[210mm] print:h-[297mm]"
+              className="print-wrapper-box relative"
               style={{ width: `${a4WidthPx * scale}px`, height: `${a4HeightPx * scale}px` }}
             >
               <div 
-                ref={containerRef} 
-                className="print-preview-container absolute top-0 left-0" 
+                className="print-preview-container absolute top-0 left-0 bg-white" 
                 style={{ transform: `scale(${scale})` }}
               >
-                {/* 用紙内の余白 (25mm) を確保し、はみ出しを防ぐ */}
-                <div className="p-[25mm] w-full h-full box-border">
+                {/* 用紙内の余白 (20mm~25mm) を確保し、はみ出しを防ぐ */}
+                <div className="p-[20mm] sm:p-[25mm] w-full h-full box-border">
                   {type === 'slip' ? <PrintableDeliverySlip data={data} companyInfo={companyInfo} /> : <PrintableInvoice data={data} companyInfo={companyInfo} />}
                 </div>
               </div>
@@ -287,35 +312,6 @@
             return null;
         }
       };
-
-      if (printDocument) {
-        return (
-          <div className="bg-gray-100 min-h-screen text-gray-900 font-sans print:bg-white print:font-serif print:text-black flex flex-col h-screen">
-            <div className="print:hidden p-3 bg-white flex flex-col sm:flex-row justify-between items-center border-b shadow-sm gap-2 shrink-0 z-50">
-              <p className="text-[10px] sm:text-xs text-gray-600">指で広げて拡大（ピンチアウト）できます。<br className="md:hidden"/>印刷時はブラウザのメニュー等から印刷を選んでください。</p>
-              <div className="flex space-x-2 w-full sm:w-auto">
-                <button onClick={() => window.print()} className="flex-1 sm:flex-none justify-center bg-blue-600 text-white px-3 py-2 rounded shadow hover:bg-blue-700 flex items-center font-bold text-sm">
-                  <Printer size={16} className="mr-2" /> 印刷
-                </button>
-                <button onClick={() => setPrintDocument(null)} className="flex-1 sm:flex-none justify-center bg-gray-300 text-gray-800 px-3 py-2 rounded shadow hover:bg-gray-400 font-bold text-sm">
-                  戻る
-                </button>
-              </div>
-            </div>
-            
-            {/* シンプルなスクロールエリアに変更 */}
-            <div className="preview-scroll-area print:overflow-visible p-4 sm:p-8">
-              <div className="print-preview-container">
-                {/* 印刷時も少し余白を持たせて見切れを防ぐ */}
-                <div className="p-8 sm:p-10 print:p-8">
-                  {printDocument.type === 'slip' && <PrintableDeliverySlip data={printDocument.data} companyInfo={companyInfo} />}
-                  {printDocument.type === 'invoice' && <PrintableInvoice data={printDocument.data} companyInfo={companyInfo} />}
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      }
 
       return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans pb-20 md:pb-0">
@@ -1093,4 +1089,5 @@
     }
   </script>
 </body>
+</html>
 </html>
