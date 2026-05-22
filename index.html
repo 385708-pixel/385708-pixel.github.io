@@ -882,9 +882,7 @@
                   <tbody>
                     {items.map((item, index) => (
                       <tr key={index}>
-                        <td className="border border-black py-1.5 px-2 text-center h-[28px] whitespace-nowrap">
- 　　　　　　　　　　　　　 {index === 0 ? deliveryDate : ''}
-　　　　　　　　　　　　　</td>
+                        <td className="border border-black py-1.5 px-2 text-center h-[28px]">{index === 0 ? deliveryDate : ''}</td>
                         <td className="border border-black py-1.5 px-2">{item.itemName}</td>
                         <td className="border border-black py-1.5 px-2 text-center">{item.origin}</td>
                         <td className="border border-black py-1.5 px-2 text-center">{item.quantity}</td>
