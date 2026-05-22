@@ -23,14 +23,14 @@
     @media print {
       html, body, #root {
         width: 210mm !important;
-        height: 296mm !important; /* A4の高さから1mmだけ削り、白紙の2枚目を防止 */
-        max-height: 296mm !important;
+        height: auto !important; /* height固定を解除して複数ページに対応 */
+        max-height: none !important;
         margin: 0 !important;
         padding: 0 !important;
         background-color: white !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
-        overflow: hidden !important; /* はみ出しを強制カット */
+        overflow: visible !important; /* はみ出しカットを解除 */
       }
       @page {
         size: A4 portrait;
@@ -45,14 +45,18 @@
         position: static !important;
         margin: 0 !important;
         overflow: hidden !important;
-        page-break-after: avoid;
+        page-break-after: avoid; /* ラッパー側で改ページを制御 */
         page-break-inside: avoid;
       }
       .print-wrapper-box {
         width: 210mm !important;
         height: 296mm !important;
-        position: static !important;
+        position: relative !important;
         transform: none !important;
+        page-break-after: always; /* 1ページごとに確実に印刷の改ページを入れる */
+      }
+      .print-wrapper-box:last-of-type {
+        page-break-after: auto; /* 最後のページは改ページしない */
       }
       .preview-scroll-area {
         overflow: visible !important;
@@ -149,9 +153,6 @@
 
     function PrintPreview({ type, data, companyInfo, onClose }) {
       const scale = useA4Scale();
-      
-      const a4WidthPx = 210 * 3.779527;
-      const a4HeightPx = 297 * 3.779527;
 
       return (
         <div className="min-h-screen flex flex-col bg-[#e5e7eb]">
@@ -167,22 +168,9 @@
             </div>
           </div>
           
-          <div className="preview-scroll-area flex-1 overflow-auto flex justify-center items-start py-6 print:py-0 print:overflow-hidden">
-            {/* スケール後の実寸サイズを確保するラッパー */}
-            <div 
-              className="print-wrapper-box relative"
-              style={{ width: `${a4WidthPx * scale}px`, height: `${a4HeightPx * scale}px` }}
-            >
-              <div 
-                className="print-preview-container absolute top-0 left-0 bg-white" 
-                style={{ transform: `scale(${scale})` }}
-              >
-                {/* 用紙内の余白 (20mm~25mm) を確保し、はみ出しを防ぐ */}
-                <div className="p-[20mm] sm:p-[25mm] w-full h-full box-border">
-                  {type === 'slip' ? <PrintableDeliverySlip data={data} companyInfo={companyInfo} /> : <PrintableInvoice data={data} companyInfo={companyInfo} />}
-                </div>
-              </div>
-            </div>
+          {/* 複数ページを並べるために gap-6 を追加 */}
+          <div className="preview-scroll-area flex-1 overflow-auto flex flex-col items-center py-6 gap-6 print:py-0 print:gap-0 print:overflow-visible">
+            {type === 'slip' ? <PrintableDeliverySlip data={data} companyInfo={companyInfo} scale={scale} /> : <PrintableInvoice data={data} companyInfo={companyInfo} scale={scale} />}
           </div>
         </div>
       );
@@ -837,7 +825,7 @@
       return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
     };
 
-    function PrintableDeliverySlip({ data, companyInfo }) {
+    function PrintableDeliverySlip({ data, companyInfo, scale }) {
       const { items, customerName, tax8, tax10, totalAmount } = data;
       const deliveryDate = items.length > 0 ? items[0].date.split('-').slice(1).join('/') : '';
       const MIN_ROWS = 15;
@@ -848,117 +836,139 @@
       const totalTax = Math.floor(tax8) + Math.floor(tax10);
       const grandTotal = subtotal + totalTax;
 
+      const a4WidthPx = 210 * 3.779527;
+      const a4HeightPx = 297 * 3.779527;
+
       return (
-        <div className="text-[13px] leading-snug tracking-wider">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold tracking-[0.5em] inline-block border-b border-black pb-1">納品書</h1>
-          </div>
+        <div 
+          className="print-wrapper-box relative"
+          style={{ width: `${a4WidthPx * scale}px`, height: `${a4HeightPx * scale}px` }}
+        >
+          <div 
+            className="print-preview-container absolute top-0 left-0 bg-white" 
+            style={{ transform: `scale(${scale})` }}
+          >
+            <div className="p-[20mm] sm:p-[25mm] w-full h-full box-border">
+              <div className="text-[13px] leading-snug tracking-wider">
+                <div className="text-center mb-6">
+                  <h1 className="text-2xl font-bold tracking-[0.5em] inline-block border-b border-black pb-1">納品書</h1>
+                </div>
 
-          <div className="flex justify-between items-start mb-6">
-            <div className="w-1/2 pt-2">
-              <h2 className="text-xl font-bold border-b border-black pb-1 mb-8 inline-block min-w-[70%]">
-                {customerName} <span className="text-base font-normal ml-4">御中</span>
-              </h2>
-              <p className="text-xs mb-4">下記のとおり納品致しましたのでご査収ください</p>
-            </div>
-            <div className="w-5/12 text-xs relative">
-              <p className="font-bold text-lg mb-1">{companyInfo.name}</p>
-              <p className="whitespace-pre-line leading-relaxed mb-1">{companyInfo.address}</p>
-              <p className="text-xs mt-2">登録番号:{companyInfo.registrationNumber}</p>
-            </div>
-          </div>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="w-1/2 pt-2">
+                    <h2 className="text-xl font-bold border-b border-black pb-1 mb-8 inline-block min-w-[70%]">
+                      {customerName} <span className="text-base font-normal ml-4">御中</span>
+                    </h2>
+                    <p className="text-xs mb-4">下記のとおり納品致しましたのでご査収ください</p>
+                  </div>
+                  <div className="w-5/12 text-xs relative">
+                    <p className="font-bold text-lg mb-1">{companyInfo.name}</p>
+                    <p className="whitespace-pre-line leading-relaxed mb-1">{companyInfo.address}</p>
+                    <p className="text-xs mt-2">登録番号:{companyInfo.registrationNumber}</p>
+                  </div>
+                </div>
 
-          <table className="w-full border-collapse border-2 border-black mb-1">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border border-black py-1.5 px-2 w-[12%] font-normal">納品日</th>
-                <th className="border border-black py-1.5 px-2 w-[30%] font-normal">内容</th>
-                <th className="border border-black py-1.5 px-2 w-[15%] font-normal">産地</th>
-                <th className="border border-black py-1.5 px-2 w-[10%] font-normal">数量（個）</th>
-                <th className="border border-black py-1.5 px-2 w-[15%] font-normal">単価（円）</th>
-                <th className="border border-black py-1.5 px-2 w-[18%] font-normal">金額</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, index) => (
-                <tr key={index}>
-                  <td className="border border-black py-1.5 px-2 text-center h-[28px]">{index === 0 ? deliveryDate : ''}</td>
-                  <td className="border border-black py-1.5 px-2">{item.itemName}</td>
-                  <td className="border border-black py-1.5 px-2 text-center">{item.origin}</td>
-                  <td className="border border-black py-1.5 px-2 text-center">{item.quantity}</td>
-                  <td className="border border-black py-1.5 px-2 text-right">{formatYen(item.unitPrice)}</td>
-                  <td className="border border-black py-1.5 px-2 text-right">{formatYen(item.quantity * item.unitPrice)}</td>
-                </tr>
-              ))}
-              {emptyRows.map((_, i) => (
-                <tr key={`empty-${i}`}>
-                  <td className="border border-black py-1.5 px-2 h-[28px]"></td>
-                  <td className="border border-black py-1.5 px-2"></td>
-                  <td className="border border-black py-1.5 px-2"></td>
-                  <td className="border border-black py-1.5 px-2"></td>
-                  <td className="border border-black py-1.5 px-2"></td>
-                  <td className="border border-black py-1.5 px-2"></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                <table className="w-full border-collapse border-2 border-black mb-1">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="border border-black py-1.5 px-2 w-[12%] font-normal">納品日</th>
+                      <th className="border border-black py-1.5 px-2 w-[30%] font-normal">内容</th>
+                      <th className="border border-black py-1.5 px-2 w-[15%] font-normal">産地</th>
+                      <th className="border border-black py-1.5 px-2 w-[10%] font-normal">数量（個）</th>
+                      <th className="border border-black py-1.5 px-2 w-[15%] font-normal">単価（円）</th>
+                      <th className="border border-black py-1.5 px-2 w-[18%] font-normal">金額</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item, index) => (
+                      <tr key={index}>
+                        <td className="border border-black py-1.5 px-2 text-center h-[28px]">{index === 0 ? deliveryDate : ''}</td>
+                        <td className="border border-black py-1.5 px-2">{item.itemName}</td>
+                        <td className="border border-black py-1.5 px-2 text-center">{item.origin}</td>
+                        <td className="border border-black py-1.5 px-2 text-center">{item.quantity}</td>
+                        <td className="border border-black py-1.5 px-2 text-right">{formatYen(item.unitPrice)}</td>
+                        <td className="border border-black py-1.5 px-2 text-right">{formatYen(item.quantity * item.unitPrice)}</td>
+                      </tr>
+                    ))}
+                    {emptyRows.map((_, i) => (
+                      <tr key={`empty-${i}`}>
+                        <td className="border border-black py-1.5 px-2 h-[28px]"></td>
+                        <td className="border border-black py-1.5 px-2"></td>
+                        <td className="border border-black py-1.5 px-2"></td>
+                        <td className="border border-black py-1.5 px-2"></td>
+                        <td className="border border-black py-1.5 px-2"></td>
+                        <td className="border border-black py-1.5 px-2"></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-          <div className="flex justify-between items-end mt-2">
-            <div className="w-1/3 border-2 border-black h-32 p-1 relative">
-              <span className="absolute top-1 left-1 text-xs">備考</span>
-            </div>
-            <div className="w-[33%]">
-              <table className="w-full border-collapse border-2 border-black text-center">
-                <tbody>
-                  <tr>
-                    <td className="border border-black py-1 bg-gray-100 w-1/2 text-sm tracking-widest">小計</td>
-                    <td className="border border-black py-1 w-1/2 text-right pr-2">{formatYen(subtotal)}</td>
-                  </tr>
-                  <tr>
-                    <td className="border border-black py-1 bg-gray-100 text-sm tracking-widest">
-                      消費税 {tax10 > 0 && tax8 > 0 ? '' : tax8 > 0 ? '(8%)' : '(10%)'}
-                    </td>
-                    <td className="border border-black py-1 text-right pr-2">{formatYen(totalTax)}</td>
-                  </tr>
-                  <tr>
-                    <td className="border border-black py-1 bg-gray-100 text-sm tracking-widest">御買上合計額</td>
-                    <td className="border border-black py-1 font-bold text-right pr-2">{formatYen(grandTotal)}</td>
-                  </tr>
-                </tbody>
-              </table>
+                <div className="flex justify-between items-end mt-2">
+                  <div className="w-1/3 border-2 border-black h-32 p-1 relative">
+                    <span className="absolute top-1 left-1 text-xs">備考</span>
+                  </div>
+                  <div className="w-[33%]">
+                    <table className="w-full border-collapse border-2 border-black text-center">
+                      <tbody>
+                        <tr>
+                          <td className="border border-black py-1 bg-gray-100 w-1/2 text-sm tracking-widest">小計</td>
+                          <td className="border border-black py-1 w-1/2 text-right pr-2">{formatYen(subtotal)}</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-black py-1 bg-gray-100 text-sm tracking-widest">
+                            消費税 {tax10 > 0 && tax8 > 0 ? '' : tax8 > 0 ? '(8%)' : '(10%)'}
+                          </td>
+                          <td className="border border-black py-1 text-right pr-2">{formatYen(totalTax)}</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-black py-1 bg-gray-100 text-sm tracking-widest">御買上合計額</td>
+                          <td className="border border-black py-1 font-bold text-right pr-2">{formatYen(grandTotal)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       );
     }
 
-    function PrintableInvoice({ data, companyInfo }) {
+    function PrintableInvoice({ data, companyInfo, scale }) {
       const { customerName, startDate, endDate, items, totals } = data;
-      const displayRows = [];
+      const allRows = [];
       let currentDate = null;
       let dailySubtotal = 0;
       let dailyTax = 0;
 
       items.forEach((item) => {
         if (currentDate !== item.date && currentDate !== null) {
-          displayRows.push({ type: 'daily_total', subtotal: dailySubtotal, tax: dailyTax });
+          allRows.push({ type: 'daily_total', subtotal: dailySubtotal, tax: dailyTax });
           dailySubtotal = 0;
           dailyTax = 0;
         }
         currentDate = item.date;
-        displayRows.push({ type: 'item', ...item });
+        allRows.push({ type: 'item', ...item });
         const lineTotal = item.quantity * item.unitPrice;
         dailySubtotal += lineTotal;
         dailyTax += Math.floor(lineTotal * (item.taxRate / 100));
       });
 
       if (currentDate !== null) {
-        displayRows.push({ type: 'daily_total', subtotal: dailySubtotal, tax: dailyTax });
+        allRows.push({ type: 'daily_total', subtotal: dailySubtotal, tax: dailyTax });
       }
 
-      const MIN_ROWS = 25;
-      const emptyRowsCount = Math.max(0, MIN_ROWS - displayRows.length);
-      const emptyRows = Array(emptyRowsCount).fill(null);
+      // ★1ページに入る行数を固定してページネーションを作成（上下の余白を担保）
+      const ROWS_PER_PAGE = 22; 
+      const pages = [];
+      let rowIndex = 0;
+      while (rowIndex < allRows.length) {
+        pages.push(allRows.slice(rowIndex, rowIndex + ROWS_PER_PAGE));
+        rowIndex += ROWS_PER_PAGE;
+      }
+      if (pages.length === 0) pages.push([]);
+
       const closingDateStr = formatDateJP(endDate);
 
       let taxLabel = "";
@@ -966,109 +976,135 @@
       else if (totals.tax10 > 0 && totals.tax8 === 0) taxLabel = "内消費税10%";
       else taxLabel = "内消費税"; 
 
+      const a4WidthPx = 210 * 3.779527;
+      const a4HeightPx = 297 * 3.779527;
+
       return (
-        <div className="text-[13px] leading-snug">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold tracking-[0.5em] inline-block border-b border-black pb-1">請求書</h1>
-          </div>
+        <>
+          {pages.map((pageRows, pageIndex) => {
+            const emptyRowsCount = Math.max(0, ROWS_PER_PAGE - pageRows.length);
+            const emptyRows = Array(emptyRowsCount).fill(null);
 
-          <div className="flex justify-between items-start mb-2">
-            <div className="w-1/2 pt-2">
-              <h2 className="text-xl font-bold border-b border-black pb-1 mb-8 inline-block min-w-[70%]">
-                {customerName} <span className="text-base font-normal ml-4">御中</span>
-              </h2>
-              <p className="text-xs mb-4">下記のとおりご請求申し上げます。</p>
-              <p className="text-xs">登録番号:{companyInfo.registrationNumber}</p>
-            </div>
-            <div className="w-5/12 text-xs relative">
-              <p className="font-bold text-lg mb-1">{companyInfo.name}</p>
-              <p className="whitespace-pre-line leading-relaxed mb-1">{companyInfo.address}</p>
-            </div>
-          </div>
+            return (
+              <div 
+                key={pageIndex}
+                className="print-wrapper-box relative"
+                style={{ width: `${a4WidthPx * scale}px`, height: `${a4HeightPx * scale}px` }}
+              >
+                <div 
+                  className="print-preview-container absolute top-0 left-0 bg-white" 
+                  style={{ transform: `scale(${scale})` }}
+                >
+                  <div className="p-[20mm] sm:p-[25mm] w-full h-full box-border">
+                    <div className="text-[13px] leading-snug flex flex-col h-full">
+                      <div className="text-center mb-6">
+                        <h1 className="text-2xl font-bold tracking-[0.5em] inline-block border-b border-black pb-1">請求書</h1>
+                      </div>
 
-          <div className="flex justify-end mb-1 relative">
-            <div className="w-[45%]">
-               <div className="flex justify-between text-xs mb-1">
-                 <span>請求締切日　{closingDateStr}</span>
-                 <span>P.1</span>
-               </div>
-               <div className="border-2 border-black flex items-stretch">
-                 <div className="bg-gray-100 border-r border-black flex items-center justify-center px-4 py-1">
-                   <span className="tracking-widest">合計（税込）</span>
-                 </div>
-                 <div className="flex-1 flex items-center justify-center py-1 font-bold text-lg">
-                   {formatYen(totals.grandTotal)}
-                 </div>
-               </div>
-               <div className="text-right text-xs mt-0.5">
-                 （{taxLabel} {formatYen(totals.totalTax)}）
-               </div>
-            </div>
-          </div>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="w-1/2 pt-2">
+                          <h2 className="text-xl font-bold border-b border-black pb-1 mb-8 inline-block min-w-[70%]">
+                            {customerName} <span className="text-base font-normal ml-4">御中</span>
+                          </h2>
+                          <p className="text-xs mb-4">下記のとおりご請求申し上げます。</p>
+                          <p className="text-xs">登録番号:{companyInfo.registrationNumber}</p>
+                        </div>
+                        <div className="w-5/12 text-xs relative">
+                          <p className="font-bold text-lg mb-1">{companyInfo.name}</p>
+                          <p className="whitespace-pre-line leading-relaxed mb-1">{companyInfo.address}</p>
+                        </div>
+                      </div>
 
-          <table className="w-full border-collapse border-2 border-black text-xs mb-1">
-            <thead>
-              <tr className="bg-gray-100 border-b-2 border-black">
-                <th className="border border-black py-1 px-1 w-[14%] font-normal">納品日</th>
-                <th className="border border-black py-1 px-1 w-[26%] font-normal">内容</th>
-                <th className="border border-black py-1 px-1 w-[12%] font-normal">産地</th>
-                <th className="border border-black py-1 px-1 w-[10%] font-normal">数量（個）</th>
-                <th className="border border-black py-1 px-1 w-[12%] font-normal">単価（円）</th>
-                <th className="border border-black py-1 px-1 w-[13%] font-normal">金額</th>
-                <th className="border border-black py-1 px-1 w-[13%] font-normal">消費税</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayRows.map((row, index) => {
-                if (row.type === 'item') {
-                  return (
-                    <tr key={index} className="border-b border-gray-300">
-                      <td className="border border-black py-1 px-1 text-center h-[24px]">{formatDateJP(row.date)}</td>
-                      <td className="border border-black py-1 px-1">{row.itemName}</td>
-                      <td className="border border-black py-1 px-1 text-center">{row.origin}</td>
-                      <td className="border border-black py-1 px-1 text-right">{row.quantity}</td>
-                      <td className="border border-black py-1 px-1 text-right">{formatYen(row.unitPrice)}</td>
-                      <td className="border border-black py-1 px-1 text-right">{formatYen(row.quantity * row.unitPrice)}</td>
-                      <td className="border border-black py-1 px-1"></td>
-                    </tr>
-                  );
-                } else if (row.type === 'daily_total') {
-                  return (
-                    <tr key={`total-${index}`} className="border-b-2 border-black bg-gray-50">
-                      <td className="border border-black py-1 px-1"></td>
-                      <td className="border border-black py-1 px-1"></td>
-                      <td className="border border-black py-1 px-1"></td>
-                      <td className="border border-black py-1 px-1 text-center font-bold" colSpan="2">【日計】</td>
-                      <td className="border border-black py-1 px-1 text-right font-bold">{formatYen(row.subtotal)}</td>
-                      <td className="border border-black py-1 px-1 text-right">{formatYen(row.tax)}</td>
-                    </tr>
-                  );
-                }
-                return null;
-              })}
-              {emptyRows.map((_, i) => (
-                <tr key={`empty-${i}`}>
-                  <td className="border border-black py-1 px-1 h-[24px]"></td>
-                  <td className="border border-black py-1 px-1"></td>
-                  <td className="border border-black py-1 px-1"></td>
-                  <td className="border border-black py-1 px-1"></td>
-                  <td className="border border-black py-1 px-1"></td>
-                  <td className="border border-black py-1 px-1"></td>
-                  <td className="border border-black py-1 px-1"></td>
-                </tr>
-              ))}
-              <tr>
-                <td className="border-t border-black py-1" colSpan="5"></td>
-                <td className="border border-black py-1 px-1 text-right">{formatYen(totals.totalSubtotal)}</td>
-                <td className="border border-black py-1 px-1 text-right">{formatYen(totals.totalTax)}</td>
-              </tr>
-            </tbody>
-          </table>
+                      <div className="flex justify-end mb-1 relative">
+                        <div className="w-[45%]">
+                           <div className="flex justify-between text-xs mb-1">
+                             <span>請求締切日　{closingDateStr}</span>
+                             {/* ★ページ数を動的に表示 */}
+                             <span>P.{pageIndex + 1}</span>
+                           </div>
+                           <div className="border-2 border-black flex items-stretch">
+                             <div className="bg-gray-100 border-r border-black flex items-center justify-center px-4 py-1">
+                               <span className="tracking-widest">合計（税込）</span>
+                             </div>
+                             <div className="flex-1 flex items-center justify-center py-1 font-bold text-lg">
+                               {formatYen(totals.grandTotal)}
+                             </div>
+                           </div>
+                           <div className="text-right text-xs mt-0.5">
+                             （{taxLabel} {formatYen(totals.totalTax)}）
+                           </div>
+                        </div>
+                      </div>
 
-          <div className="mt-4 font-bold text-sm">
-            {companyInfo.bankInfo}
-          </div>
-        </div>
+                      <table className="w-full border-collapse border-2 border-black text-xs mb-1">
+                        <thead>
+                          <tr className="bg-gray-100 border-b-2 border-black">
+                            <th className="border border-black py-1 px-1 w-[14%] font-normal">納品日</th>
+                            <th className="border border-black py-1 px-1 w-[26%] font-normal">内容</th>
+                            <th className="border border-black py-1 px-1 w-[12%] font-normal">産地</th>
+                            <th className="border border-black py-1 px-1 w-[10%] font-normal">数量（個）</th>
+                            <th className="border border-black py-1 px-1 w-[12%] font-normal">単価（円）</th>
+                            <th className="border border-black py-1 px-1 w-[13%] font-normal">金額</th>
+                            <th className="border border-black py-1 px-1 w-[13%] font-normal">消費税</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pageRows.map((row, index) => {
+                            if (row.type === 'item') {
+                              return (
+                                <tr key={index} className="border-b border-gray-300">
+                                  <td className="border border-black py-1 px-1 text-center h-[24px]">{formatDateJP(row.date)}</td>
+                                  <td className="border border-black py-1 px-1">{row.itemName}</td>
+                                  <td className="border border-black py-1 px-1 text-center">{row.origin}</td>
+                                  <td className="border border-black py-1 px-1 text-right">{row.quantity}</td>
+                                  <td className="border border-black py-1 px-1 text-right">{formatYen(row.unitPrice)}</td>
+                                  <td className="border border-black py-1 px-1 text-right">{formatYen(row.quantity * row.unitPrice)}</td>
+                                  <td className="border border-black py-1 px-1"></td>
+                                </tr>
+                              );
+                            } else if (row.type === 'daily_total') {
+                              return (
+                                <tr key={`total-${index}`} className="border-b-2 border-black bg-gray-50">
+                                  <td className="border border-black py-1 px-1"></td>
+                                  <td className="border border-black py-1 px-1"></td>
+                                  <td className="border border-black py-1 px-1"></td>
+                                  <td className="border border-black py-1 px-1 text-center font-bold" colSpan="2">【日計】</td>
+                                  <td className="border border-black py-1 px-1 text-right font-bold">{formatYen(row.subtotal)}</td>
+                                  <td className="border border-black py-1 px-1 text-right">{formatYen(row.tax)}</td>
+                                </tr>
+                              );
+                            }
+                            return null;
+                          })}
+                          {emptyRows.map((_, i) => (
+                            <tr key={`empty-${i}`}>
+                              <td className="border border-black py-1 px-1 h-[24px]"></td>
+                              <td className="border border-black py-1 px-1"></td>
+                              <td className="border border-black py-1 px-1"></td>
+                              <td className="border border-black py-1 px-1"></td>
+                              <td className="border border-black py-1 px-1"></td>
+                              <td className="border border-black py-1 px-1"></td>
+                              <td className="border border-black py-1 px-1"></td>
+                            </tr>
+                          ))}
+                          <tr>
+                            <td className="border-t border-black py-1" colSpan="5"></td>
+                            <td className="border border-black py-1 px-1 text-right">{formatYen(totals.totalSubtotal)}</td>
+                            <td className="border border-black py-1 px-1 text-right">{formatYen(totals.totalTax)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+
+                      <div className="mt-4 font-bold text-sm">
+                        {companyInfo.bankInfo}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </>
       );
     }
 
@@ -1089,5 +1125,4 @@
     }
   </script>
 </body>
-</html>
 </html>
