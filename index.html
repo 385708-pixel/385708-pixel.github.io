@@ -383,6 +383,7 @@
         itemName: '',
         origin: '',
         quantity: 1,
+        unit: '個', // ★単位を追加
         unitPrice: 0,
         taxRate: 8,
       });
@@ -398,13 +399,15 @@
           id: Date.now(),
           ...formData,
           quantity: Number(formData.quantity),
+          unit: formData.unit || '個',
           unitPrice: Number(formData.unitPrice),
           taxRate: Number(formData.taxRate),
         };
 
         // 画面（ローカル）には即座に反映
         setDeliveries([newDelivery, ...deliveries]);
-        setFormData({ ...formData, itemName: '', origin: '', quantity: 1, unitPrice: 0 }); 
+        // 入力フォームをリセット（日付や顧客名は保持）
+        setFormData({ ...formData, itemName: '', origin: '', quantity: 1, unit: '個', unitPrice: 0 }); 
 
         // 裏側でGoogleスプレッドシートへ送信
         fetch(GAS_URL, {
@@ -490,10 +493,36 @@
                   {uniqueOrigins.map((origin, i) => <option key={i} value={origin} />)}
                 </datalist>
               </div>
+              
+              {/* ★数量と単位をまとめて入力できるように変更 */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">数量 (個)</label>
-                <input type="number" required min="1" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="block text-sm font-medium text-slate-700 mb-1">数量</label>
+                <div className="flex">
+                  <input 
+                    type="number" 
+                    required 
+                    min={formData.unit === 'kg' ? "0.1" : "1"} 
+                    step={formData.unit === 'kg' ? "0.1" : "1"} 
+                    value={formData.quantity} 
+                    onChange={e => setFormData({...formData, quantity: e.target.value})} 
+                    className="w-2/3 border border-slate-300 rounded-l px-3 py-3 md:py-2 text-base md:text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                  />
+                  <select 
+                    value={formData.unit} 
+                    onChange={e => {
+                        const newUnit = e.target.value;
+                        // kgから個に変えたときに小数部分を切り上げるなどして整数に戻す
+                        const newQuantity = newUnit === '個' ? Math.max(1, Math.round(Number(formData.quantity))) : formData.quantity;
+                        setFormData({...formData, unit: newUnit, quantity: newQuantity});
+                    }} 
+                    className="w-1/3 border-y border-r border-slate-300 rounded-r px-2 py-3 md:py-2 text-base md:text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                  >
+                    <option value="個">個</option>
+                    <option value="kg">kg</option>
+                  </select>
+                </div>
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">単価 (円)</label>
                 <input type="number" required min="0" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="w-full border border-slate-300 rounded px-3 py-3 md:py-2 text-base md:text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none" />
@@ -537,7 +566,8 @@
                     <td className="px-4 py-3">{d.customerName}</td>
                     <td className="px-4 py-3">{d.itemName}</td>
                     <td className="px-4 py-3">{d.origin}</td>
-                    <td className="px-4 py-3 text-right">{d.quantity}</td>
+                    {/* ★数量の表示に単位を結合 */}
+                    <td className="px-4 py-3 text-right">{d.quantity}{d.unit || '個'}</td>
                     <td className="px-4 py-3 text-right">{formatYen(d.unitPrice)}</td>
                     <td className="px-4 py-3 text-center">{d.taxRate}%</td>
                     <td className="px-4 py-3 text-center">
@@ -573,7 +603,8 @@
                 </div>
                 <div className="flex justify-between items-end border-t border-slate-100 pt-2 mt-2">
                   <div className="text-sm text-slate-600">
-                    {d.quantity}個 × {formatYen(d.unitPrice)}
+                    {/* ★スマホ用の数量表示にも単位を結合 */}
+                    {d.quantity}{d.unit || '個'} × {formatYen(d.unitPrice)}
                     <span className="ml-2 bg-slate-100 text-xs px-1.5 py-0.5 rounded text-slate-500">{d.taxRate}%</span>
                   </div>
                   <div className="font-bold text-blue-700 text-lg">
@@ -804,7 +835,8 @@
             </h3>
             <p className="text-sm text-slate-600 mb-4 leading-relaxed">
               通常、納品データはスマホ本体に保存され、アプリの起動待ち時間はありません（登録時のみスプレッドシートへバックアップされます）。<br/>
-              パソコン等でスプレッドシートを直接編集・削除した場合は、以下のボタンを押して最新データをスマホに読み込んでください。
+              パソコン等でスプレッドシートを直接編集・削除した場合は、以下のボタンを押して最新データをスマホに読み込んでください。<br/>
+              <span className="text-red-500 font-bold text-xs">※クラウドから読み込み直すと、単位(kg)が「個」にリセットされる場合があります。</span>
             </p>
             <button 
               onClick={onSync}
@@ -874,7 +906,8 @@
                       <th className="border border-black py-1.5 px-2 w-[12%] font-normal">納品日</th>
                       <th className="border border-black py-1.5 px-2 w-[30%] font-normal">内容</th>
                       <th className="border border-black py-1.5 px-2 w-[15%] font-normal">産地</th>
-                      <th className="border border-black py-1.5 px-2 w-[10%] font-normal">数量（個）</th>
+                      {/* ★プレビュー側のヘッダーも「数量」に修正 */}
+                      <th className="border border-black py-1.5 px-2 w-[10%] font-normal">数量</th>
                       <th className="border border-black py-1.5 px-2 w-[15%] font-normal">単価（円）</th>
                       <th className="border border-black py-1.5 px-2 w-[18%] font-normal">金額</th>
                     </tr>
@@ -885,7 +918,8 @@
                         <td className="border border-black py-1.5 px-2 text-center h-[28px]">{index === 0 ? deliveryDate : ''}</td>
                         <td className="border border-black py-1.5 px-2">{item.itemName}</td>
                         <td className="border border-black py-1.5 px-2 text-center">{item.origin}</td>
-                        <td className="border border-black py-1.5 px-2 text-center">{item.quantity}</td>
+                        {/* ★表示時に単位を結合 */}
+                        <td className="border border-black py-1.5 px-2 text-center">{item.quantity}{item.unit || '個'}</td>
                         <td className="border border-black py-1.5 px-2 text-right">{formatYen(item.unitPrice)}</td>
                         <td className="border border-black py-1.5 px-2 text-right">{formatYen(item.quantity * item.unitPrice)}</td>
                       </tr>
@@ -959,7 +993,6 @@
         allRows.push({ type: 'daily_total', subtotal: dailySubtotal, tax: dailyTax });
       }
 
-      // ★1ページに入る行数を固定してページネーションを作成（上下の余白を担保）
       const ROWS_PER_PAGE = 22; 
       const pages = [];
       let rowIndex = 0;
@@ -1019,7 +1052,6 @@
                         <div className="w-[45%]">
                            <div className="flex justify-between text-xs mb-1">
                              <span>請求締切日　{closingDateStr}</span>
-                             {/* ★ページ数を動的に表示 */}
                              <span>P.{pageIndex + 1}</span>
                            </div>
                            <div className="border-2 border-black flex items-stretch">
@@ -1042,7 +1074,8 @@
                             <th className="border border-black py-1 px-1 w-[14%] font-normal">納品日</th>
                             <th className="border border-black py-1 px-1 w-[26%] font-normal">内容</th>
                             <th className="border border-black py-1 px-1 w-[12%] font-normal">産地</th>
-                            <th className="border border-black py-1 px-1 w-[10%] font-normal">数量（個）</th>
+                            {/* ★プレビュー側のヘッダーも「数量」に修正 */}
+                            <th className="border border-black py-1 px-1 w-[10%] font-normal">数量</th>
                             <th className="border border-black py-1 px-1 w-[12%] font-normal">単価（円）</th>
                             <th className="border border-black py-1 px-1 w-[13%] font-normal">金額</th>
                             <th className="border border-black py-1 px-1 w-[13%] font-normal">消費税</th>
@@ -1056,7 +1089,8 @@
                                   <td className="border border-black py-1 px-1 text-left h-[28px] whitespace-nowrap">{formatDateJP(row.date)}</td>
                                   <td className="border border-black py-1 px-1">{row.itemName}</td>
                                   <td className="border border-black py-1 px-1 text-center">{row.origin}</td>
-                                  <td className="border border-black py-1 px-1 text-right">{row.quantity}</td>
+                                  {/* ★表示時に単位を結合 */}
+                                  <td className="border border-black py-1 px-1 text-right">{row.quantity}{row.unit || '個'}</td>
                                   <td className="border border-black py-1 px-1 text-right">{formatYen(row.unitPrice)}</td>
                                   <td className="border border-black py-1 px-1 text-right">{formatYen(row.quantity * row.unitPrice)}</td>
                                   <td className="border border-black py-1 px-1"></td>
@@ -1125,4 +1159,5 @@
     }
   </script>
 </body>
+</html>
 </html>
