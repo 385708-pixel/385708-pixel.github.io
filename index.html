@@ -145,19 +145,36 @@
     }
 
     function PrintPreview({ type, data, companyInfo, onClose }) {
-      const scale = useA4Scale();
+      const scale = useA4Scale();
 
-      return (
-        <div className="min-h-screen flex flex-col bg-[#e5e7eb]">
-          <div className="bg-white p-3 flex justify-between items-center border-b shadow-md sticky top-0 z-50 print:hidden">
-            <p className="text-[10px] sm:text-xs text-gray-600">画面幅に合わせて自動縮小表示されます。<br className="md:hidden"/>印刷時はブラウザのメニューから印刷を選んでください。</p>
-            <div className="flex space-x-2 w-full sm:w-auto justify-end">
-              <button onClick={() => window.print()} className="bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm shadow flex items-center">
-                <Printer size={16} className="mr-2" /> 印刷
-              </button>
-              <button onClick={onClose} className="bg-gray-500 text-white px-4 py-2 rounded font-bold text-sm shadow">
-                戻る
-              </button>
+      // ★追加箇所: iPhone向け印刷対応
+      const handlePrint = () => {
+        // iOS（iPhone/iPad）かつ、PWA（Standaloneモード）かどうかを判定
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+        if (isIOS && isStandalone) {
+          alert("iPhoneのアプリモードではOSの制限により印刷画面が開かない場合があります。\n反応しない場合は、通常のSafariブラウザで開き直して印刷をお試しください。");
+        }
+        
+        // レンダリングとの競合を防ぐため、少し遅延させて実行する
+        setTimeout(() => {
+          window.print();
+        }, 300);
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col bg-[#e5e7eb]">
+          <div className="bg-white p-3 flex justify-between items-center border-b shadow-md sticky top-0 z-50 print:hidden">
+            <p className="text-[10px] sm:text-xs text-gray-600">画面幅に合わせて自動縮小表示されます。<br className="md:hidden"/>印刷時はブラウザのメニューから印刷を選んでください。</p>
+            <div className="flex space-x-2 w-full sm:w-auto justify-end">
+              {/* ★修正箇所: onClickの処理を handlePrint に変更 */}
+              <button onClick={handlePrint} className="bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm shadow flex items-center">
+                <Printer size={16} className="mr-2" /> 印刷
+              </button>
+              <button onClick={onClose} className="bg-gray-500 text-white px-4 py-2 rounded font-bold text-sm shadow">
+                戻る
+              </button>
             </div>
           </div>
           <div className="preview-scroll-area flex-1 overflow-auto flex flex-col items-center py-6 gap-6 print:py-0 print:gap-0 print:overflow-visible">
