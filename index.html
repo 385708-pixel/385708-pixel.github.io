@@ -9,6 +9,17 @@
   <link rel="manifest" href="manifest.json?v=2">
   <meta name="theme-color" content="#1e3a8a">
 
+  <!-- ★追加箇所: iPhone/iPadの場合はマニフェストを無効化してアプリモード(Standalone)を防ぐ -->
+  <script>
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) {
+      var manifestNode = document.getElementById('manifest-link');
+      if (manifestNode) {
+        manifestNode.parentNode.removeChild(manifestNode);
+        console.log('iOS環境のため、PWAマニフェストを無効化しました（ブラウザ起動を強制）');
+      }
+    }
+  </script>
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
